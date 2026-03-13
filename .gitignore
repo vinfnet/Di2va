@@ -1,0 +1,37 @@
+# ─── Secrets & Environment ───────────────────────────────────────
+# NEVER commit real credentials
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# ─── Dependencies ────────────────────────────────────────────────
+node_modules/
+package-lock.json
+
+# ─── Uploads & User Data ─────────────────────────────────────────
+uploads/
+*.fit
+
+# ─── OS Files ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ─── IDE / Editor ────────────────────────────────────────────────
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ─── Logs & Debug ────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ─── Build Artifacts ─────────────────────────────────────────────
+dist/
+build/
+.cache/

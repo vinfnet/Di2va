@@ -1,0 +1,655 @@
+/* ─── Variables ──────────────────────────────────────────────────── */
+:root {
+  --bg: #0f1117;
+  --bg-card: #1a1d27;
+  --bg-card-hover: #222633;
+  --bg-header: #161822;
+  --border: #2a2d3a;
+  --text: #e4e4e7;
+  --text-muted: #8b8fa3;
+  --accent: #fc4c02; /* Strava orange */
+  --accent-hover: #e04400;
+  --blue: #3b82f6;
+  --green: #22c55e;
+  --yellow: #eab308;
+  --red: #ef4444;
+  --purple: #a855f7;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ─── Reset ──────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-hover); }
+
+.hidden { display: none !important; }
+
+/* ─── Header ─────────────────────────────────────────────────────── */
+#header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 56px;
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+}
+
+#header h1 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+#user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.875rem;
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+.btn-lg { padding: 12px 24px; font-size: 1rem; }
+
+.btn-strava {
+  background: var(--accent);
+  color: white;
+}
+.btn-strava:hover { background: var(--accent-hover); color: white; }
+
+.btn-outline {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-outline:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--text-muted);
+}
+
+.btn-primary {
+  background: var(--blue);
+  color: white;
+}
+.btn-primary:hover { background: #2563eb; }
+
+/* ─── Screens ────────────────────────────────────────────────────── */
+.screen { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+/* ─── Login/Hero Screen ──────────────────────────────────────────── */
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: calc(100vh - 200px);
+  gap: 20px;
+}
+
+.hero-icon {
+  width: 120px;
+  height: 120px;
+  color: var(--accent);
+  opacity: 0.9;
+}
+
+.hero h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.hero p {
+  color: var(--text-muted);
+  max-width: 500px;
+  font-size: 1.05rem;
+}
+
+.hero-features {
+  display: flex;
+  gap: 32px;
+  margin: 16px 0;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.feature-icon { font-size: 1.2rem; }
+
+/* ─── Activities List ────────────────────────────────────────────── */
+.activities-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.activities-header h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.activities-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.activities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.activity-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.activity-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.activity-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.activity-card h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.activity-card .date {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.activity-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.activity-stat {
+  text-align: center;
+}
+
+.activity-stat .value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.activity-stat .label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ─── Loading ────────────────────────────────────────────────────── */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  color: var(--text-muted);
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Detail Screen ──────────────────────────────────────────────── */
+.detail-header {
+  margin-bottom: 16px;
+}
+
+.detail-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 12px 0 8px;
+}
+
+.stat-bar {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.stat-bar .stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-bar .stat .value {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.stat-bar .stat .label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ─── Gear Legend ────────────────────────────────────────────────── */
+.gear-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.gear-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.gear-legend-swatch {
+  width: 24px;
+  height: 4px;
+  border-radius: 2px;
+}
+
+/* ─── Data Source Bar ────────────────────────────────────────────── */
+.data-source-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+}
+
+.data-label { color: var(--text-muted); }
+
+.badge {
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(59,130,246,0.15);
+  color: var(--blue);
+}
+
+.badge.fit-file {
+  background: rgba(34,197,94,0.15);
+  color: var(--green);
+}
+
+/* ─── FIT Import Panel ─────────────────────────────────────────── */
+.fit-import-panel {
+  background: linear-gradient(135deg, rgba(252,76,2,0.06), rgba(59,130,246,0.06));
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.fit-import-content { max-width: 520px; margin: 0 auto; }
+
+.fit-import-icon { font-size: 2.5rem; margin-bottom: 8px; }
+
+.fit-import-content h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.fit-import-content p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.fit-import-steps {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.fit-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.fit-import-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ─── Drop Overlay ─────────────────────────────────────────────── */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,17,23,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.drop-overlay-content {
+  text-align: center;
+  padding: 48px;
+  border: 3px dashed var(--accent);
+  border-radius: 24px;
+  max-width: 400px;
+}
+
+.drop-icon { font-size: 3rem; margin-bottom: 12px; }
+
+.drop-overlay-content h3 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.drop-overlay-content p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* ─── Map ────────────────────────────────────────────────────────── */
+.map-container {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+#map {
+  height: 500px;
+  width: 100%;
+  background: #1a1d27;
+}
+
+/* ─── Elevation Chart ────────────────────────────────────────────── */
+.elevation-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.elevation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.elevation-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.elevation-controls {
+  display: flex;
+  gap: 16px;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+#elevation-chart-wrapper {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  max-height: 220px;
+  overflow: hidden;
+}
+
+#elevation-chart {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ─── Gear Stats ─────────────────────────────────────────────────── */
+.gear-stats-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.gear-stats-container h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.gear-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.gear-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.gear-stat-color {
+  width: 8px;
+  height: 40px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.gear-stat-info h4 {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.gear-stat-info .percentage {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.gear-stat-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.gear-stat-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* ─── Hover Info Panel ───────────────────────────────────────────── */
+.hover-info {
+  position: fixed;
+  top: 72px;
+  right: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  min-width: 200px;
+  box-shadow: var(--shadow);
+  z-index: 999;
+  font-size: 0.85rem;
+}
+
+.hover-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+.hover-label { color: var(--text-muted); }
+.hover-value { font-weight: 600; }
+
+/* ─── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .hero h2 { font-size: 1.5rem; }
+  .hero-features { flex-direction: column; gap: 12px; }
+  .activities-grid { grid-template-columns: 1fr; }
+  #map { height: 350px; }
+  .stat-bar { gap: 12px; }
+  .hover-info { display: none; }
+  .gear-stats-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ─── Leaflet Dark Theme Overrides ───────────────────────────────── */
+.leaflet-container {
+  background: #1a1d27;
+}
+
+.leaflet-popup-content-wrapper {
+  background: var(--bg-card);
+  color: var(--text);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.leaflet-popup-tip {
+  background: var(--bg-card);
+}
+
+.leaflet-control-zoom a {
+  background: var(--bg-card) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: var(--bg-card-hover) !important;
+}

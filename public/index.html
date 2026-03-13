@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Di2va</title>
+
+  <!-- App Icon -->
+  <link rel="icon" type="image/jpeg" href="favicon.jpg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.jpg">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- ─── Header ──────────────────────────────────────────────────── -->
+  <header id="header">
+    <div class="header-left">
+      <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="5" cy="18" r="3"/><circle cx="19" cy="18" r="3"/>
+        <path d="M5 18l4-8 4 4 6-10"/>
+      </svg>
+      <h1>Di2va</h1>
+    </div>
+    <div class="header-right">
+      <div id="user-info" class="hidden">
+        <img id="user-avatar" class="avatar" src="" alt="">
+        <span id="user-name"></span>
+        <a href="/auth/logout" class="btn btn-sm btn-outline">Logout</a>
+      </div>
+      <div id="login-prompt" class="hidden">
+        <a href="/auth/strava" class="btn btn-strava">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+            <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+          </svg>
+          Connect with Strava
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─── Main Content ────────────────────────────────────────────── -->
+  <main id="main">
+    <!-- Login Screen -->
+    <section id="login-screen" class="screen">
+      <div class="hero">
+        <div class="hero-icon">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="16" cy="48" r="10"/><circle cx="48" cy="48" r="10"/>
+            <path d="M16 48l12-24 12 12 18-28" stroke-width="3"/>
+            <path d="M8 20h12M14 14v12" stroke-width="2" opacity="0.5"/>
+            <circle cx="52" cy="12" r="4" fill="currentColor" opacity="0.3"/>
+          </svg>
+        </div>
+        <h2>Visualize Your Di2 Gear Data</h2>
+        <p>See exactly what gear your Shimano Di2 was in at every point of your ride — overlaid on a map and elevation profile.</p>
+        <div class="hero-features">
+          <div class="feature">
+            <span class="feature-icon">🗺️</span>
+            <span>Route colored by gear</span>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">⛰️</span>
+            <span>Elevation profile overlay</span>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">⚙️</span>
+            <span>Di2 shift analysis</span>
+          </div>
+        </div>
+        <a href="/auth/strava" class="btn btn-strava btn-lg">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+            <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+          </svg>
+          Connect with Strava
+        </a>
+      </div>
+    </section>
+
+    <!-- Activity List Screen -->
+    <section id="activities-screen" class="screen hidden">
+      <div class="activities-header">
+        <h2>Your Rides</h2>
+        <div class="activities-controls">
+          <button id="btn-upload-fit" class="btn btn-outline">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            </svg>
+            Upload FIT File
+          </button>
+          <input type="file" id="fit-file-input" accept=".fit" class="hidden">
+          <button id="btn-load-more" class="btn btn-outline">Load More</button>
+        </div>
+      </div>
+      <div id="activities-list" class="activities-grid"></div>
+      <div id="activities-loading" class="loading hidden">
+        <div class="spinner"></div>
+        <span>Loading activities...</span>
+      </div>
+    </section>
+
+    <!-- Activity Detail Screen -->
+    <section id="detail-screen" class="screen hidden">
+      <div class="detail-header">
+        <button id="btn-back" class="btn btn-outline btn-sm">← Back to Rides</button>
+        <h2 id="detail-title"></h2>
+        <div id="detail-stats" class="stat-bar"></div>
+      </div>
+
+      <!-- Gear Legend -->
+      <div id="gear-legend" class="gear-legend"></div>
+
+      <!-- Data Source Toggle -->
+      <div id="data-source-bar" class="data-source-bar hidden">
+        <span class="data-label">Gear data source:</span>
+        <span id="data-source-badge" class="badge">Strava Estimate</span>
+        <button id="btn-download-fit" class="btn btn-sm btn-outline hidden" title="Download .FIT from Strava (uses browser login)">
+          ⬇ Download FIT from Strava
+        </button>
+        <button id="btn-upload-fit-detail" class="btn btn-sm btn-outline">Upload FIT for exact Di2 data</button>
+        <input type="file" id="fit-file-input-detail" accept=".fit" class="hidden">
+      </div>
+
+      <!-- FIT Import Prompt (shown when no Di2 data) -->
+      <div id="fit-import-panel" class="fit-import-panel hidden">
+        <div class="fit-import-content">
+          <div class="fit-import-icon">⚙️</div>
+          <h3>Get Actual Di2 Gear Data</h3>
+          <p>Since you're logged into Strava in this browser, you can download the original .FIT file and drop it here:</p>
+          <div class="fit-import-steps">
+            <div class="fit-step">
+              <span class="step-num">1</span>
+              <span>Click <strong>"Download FIT from Strava"</strong> below — your browser will download the file</span>
+            </div>
+            <div class="fit-step">
+              <span class="step-num">2</span>
+              <span>Drag &amp; drop the downloaded <code>.fit</code> file onto this page (or click "Upload FIT")</span>
+            </div>
+          </div>
+          <div class="fit-import-actions">
+            <button id="btn-download-fit-panel" class="btn btn-strava">
+              ⬇ Download FIT from Strava
+            </button>
+            <button id="btn-upload-fit-panel" class="btn btn-outline">
+              📂 Choose FIT File
+            </button>
+          </div>
+          <button id="btn-dismiss-import" class="btn btn-sm btn-outline" style="margin-top: 8px">Skip — use estimated data</button>
+        </div>
+      </div>
+
+      <!-- Drag & Drop Overlay -->
+      <div id="drop-overlay" class="drop-overlay hidden">
+        <div class="drop-overlay-content">
+          <div class="drop-icon">📂</div>
+          <h3>Drop .FIT file here</h3>
+          <p>Release to load Di2 gear data</p>
+        </div>
+      </div>
+
+      <!-- Map -->
+      <div id="map-container" class="map-container">
+        <div id="map"></div>
+      </div>
+
+      <!-- Elevation Profile -->
+      <div id="elevation-container" class="elevation-container">
+        <div class="elevation-header">
+          <h3>Elevation Profile</h3>
+          <div class="elevation-controls">
+            <label class="toggle-label">
+              <input type="checkbox" id="toggle-gradient" checked>
+              <span>Show gradient</span>
+            </label>
+          </div>
+        </div>
+        <div id="elevation-chart-wrapper">
+          <canvas id="elevation-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Gear Stats -->
+      <div id="gear-stats-container" class="gear-stats-container hidden">
+        <h3>Gear Usage Summary</h3>
+        <div id="gear-stats" class="gear-stats-grid"></div>
+      </div>
+
+      <!-- Position Marker Info -->
+      <div id="hover-info" class="hover-info hidden">
+        <div class="hover-info-row">
+          <span class="hover-label">Gear:</span>
+          <span id="hover-gear" class="hover-value"></span>
+        </div>
+        <div class="hover-info-row">
+          <span class="hover-label">Elevation:</span>
+          <span id="hover-elevation" class="hover-value"></span>
+        </div>
+        <div class="hover-info-row">
+          <span class="hover-label">Gradient:</span>
+          <span id="hover-gradient" class="hover-value"></span>
+        </div>
+        <div class="hover-info-row">
+          <span class="hover-label">Speed:</span>
+          <span id="hover-speed" class="hover-value"></span>
+        </div>
+        <div class="hover-info-row">
+          <span class="hover-label">Cadence:</span>
+          <span id="hover-cadence" class="hover-value"></span>
+        </div>
+        <div class="hover-info-row">
+          <span class="hover-label">Power:</span>
+          <span id="hover-power" class="hover-value"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- App -->
+  <script src="app.js"></script>
+</body>
+</html>
