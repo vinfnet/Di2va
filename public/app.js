@@ -1673,17 +1673,17 @@ function createGearMesh(teeth, module_, thickness, holeRadius, material) {
  * Create the chain path as a tube between two gear centres.
  */
 function createChainMesh(frontPos, frontR, rearPos, rearR, color) {
-  const chainColor = new THREE.Color(color);
+  // Chain is always highly visible — bright orange/gold
   const mat = new THREE.MeshStandardMaterial({
-    color: chainColor,
-    metalness: 0.7,
-    roughness: 0.3,
-    transparent: true,
-    opacity: 0.55
+    color: 0xffaa00,
+    metalness: 0.6,
+    roughness: 0.35,
+    emissive: new THREE.Color(0xff8800),
+    emissiveIntensity: 0.25,
   });
 
   const group = new THREE.Group();
-  const chainRadius = 0.12;
+  const chainRadius = 0.18;
 
   // Build a path: arc around front gear (bottom), line to rear, arc around rear (top), line back
   const segments = 80;
@@ -1775,12 +1775,14 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
 
   // ── Scene ──
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x080808);
-  scene.fog = new THREE.FogExp2(0x080808, 0.018);
+  const isDarkMode = window.matchMedia?.('(prefers-color-scheme: dark)').matches !== false;
+  const bgColor = isDarkMode ? 0x1a1a2e : 0xe8e8f0;
+  scene.background = new THREE.Color(bgColor);
+  scene.fog = new THREE.FogExp2(bgColor, 0.012);
 
-  // ── Camera — offset from drive side (slightly right + above) ──
-  const camera = new THREE.PerspectiveCamera(36, W / H, 0.1, 200);
-  camera.position.set(2, 5, 20);   // shifted right (Z-axis is drive side)
+  // ── Camera — 3/4 drive-side view, pulled back ──
+  const camera = new THREE.PerspectiveCamera(32, W / H, 0.1, 200);
+  camera.position.set(-2, 4, 22);   // slightly left + above, pulled back
   camera.lookAt(0, -0.5, 0);
 
   // ── Renderer ──
@@ -1803,10 +1805,10 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
   controls.target.set(0, -0.5, 0);
   controls.maxPolarAngle = Math.PI * 0.88;
 
-  // ── Lighting ──
-  scene.add(new THREE.AmbientLight(0x404050, 0.5));
+  // ── Lighting — brighter for lighter background ──
+  scene.add(new THREE.AmbientLight(isDarkMode ? 0x505060 : 0x808090, 0.7));
 
-  const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
+  const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
   keyLight.position.set(6, 14, 12);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.set(1024, 1024);
@@ -1814,11 +1816,11 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
   keyLight.shadow.camera.far = 40;
   scene.add(keyLight);
 
-  const fillLight = new THREE.DirectionalLight(0x7799cc, 0.4);
+  const fillLight = new THREE.DirectionalLight(0x7799cc, 0.6);
   fillLight.position.set(-8, 3, -6);
   scene.add(fillLight);
 
-  const rimLight = new THREE.PointLight(0xffffff, 0.5, 35);
+  const rimLight = new THREE.PointLight(0xffffff, 0.6, 40);
   rimLight.position.set(0, -4, 14);
   scene.add(rimLight);
 
@@ -2060,7 +2062,7 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
   // ── Ground plane ──
   const groundGeo = new THREE.PlaneGeometry(40, 40);
   const groundMat = new THREE.MeshStandardMaterial({
-    color: 0x0a0a0a, metalness: 0.4, roughness: 0.85
+    color: isDarkMode ? 0x141428 : 0xd0d0d8, metalness: 0.3, roughness: 0.85
   });
   const ground = new THREE.Mesh(groundGeo, groundMat);
   ground.rotation.x = -Math.PI / 2;

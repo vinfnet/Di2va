@@ -858,9 +858,15 @@ a:hover { color: var(--accent-hover); }
   width: 100%;
   height: 420px;
   border-radius: var(--radius);
-  background: #080808;
+  background: #1a1a2e;
   overflow: hidden;
   position: relative;
+}
+
+@media (prefers-color-scheme: light) {
+  #gear-popup-3d {
+    background: #e8e8f0;
+  }
 }
 
 #gear-popup-3d canvas {
