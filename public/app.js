@@ -30,6 +30,38 @@ const CHAINRING_COLORS = {
   big: '#3b82f6'     // Outer ring (harder)
 };
 
+// ─── Units ──────────────────────────────────────────────────────────────────
+
+const KM_TO_MI = 0.621371;
+const M_TO_FT = 3.28084;
+
+function getUnits() {
+  return localStorage.getItem('di2va-units') || 'metric';
+}
+
+function isImperial() {
+  return getUnits() === 'imperial';
+}
+
+/** Convert metres to display distance (km or mi) */
+function distFromMetres(m) {
+  return isImperial() ? (m / 1000) * KM_TO_MI : m / 1000;
+}
+
+/** Convert m/s to display speed (km/h or mph) */
+function speedFromMs(ms) {
+  return isImperial() ? ms * 3.6 * KM_TO_MI : ms * 3.6;
+}
+
+/** Convert metres elevation to display (m or ft) */
+function elevFromMetres(m) {
+  return isImperial() ? m * M_TO_FT : m;
+}
+
+function distUnit()  { return isImperial() ? 'mi' : 'km'; }
+function speedUnit() { return isImperial() ? 'mph' : 'km/h'; }
+function elevUnit()  { return isImperial() ? 'ft' : 'm'; }
+
 // ─── State ──────────────────────────────────────────────────────────────────
 
 let state = {
