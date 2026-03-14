@@ -88,6 +88,13 @@
       <div class="activities-header">
         <h2>Your Rides</h2>
         <div class="activities-controls">
+          <button id="btn-settings" class="btn btn-outline btn-icon" title="Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+            </svg>
+            Settings
+          </button>
           <button id="btn-upload-fit" class="btn btn-outline">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
@@ -98,6 +105,7 @@
           <button id="btn-load-more" class="btn btn-outline">Load More</button>
         </div>
       </div>
+      <div id="fit-library-banner" class="fit-library-banner hidden"></div>
       <div id="activities-list" class="activities-grid"></div>
       <div id="activities-loading" class="loading hidden">
         <div class="spinner"></div>
@@ -220,6 +228,27 @@
       </div>
     </section>
   </main>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Settings</h3>
+        <button id="btn-close-settings" class="btn btn-sm btn-outline">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <h4>📂 FIT Library Folder</h4>
+          <p class="setting-desc">Di2va defaults to watching <code>~/Downloads</code> for FIT files downloaded from Strava. Change this if your files land somewhere else.</p>
+          <div class="setting-row">
+            <input type="text" id="fit-folder-input" placeholder="~/Downloads (default)" class="setting-input">
+            <button id="btn-save-fit-folder" class="btn btn-sm">Save</button>
+          </div>
+          <div id="fit-library-status" class="setting-status"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

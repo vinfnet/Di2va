@@ -90,7 +90,15 @@ const els = {
   btnUploadFitPanel: $('btn-upload-fit-panel'),
   btnDismissImport: $('btn-dismiss-import'),
   fitImportPanel:  $('fit-import-panel'),
-  dropOverlay:     $('drop-overlay')
+  dropOverlay:     $('drop-overlay'),
+  // Settings / FIT Library
+  btnSettings:     $('btn-settings'),
+  settingsModal:   $('settings-modal'),
+  btnCloseSettings: $('btn-close-settings'),
+  fitFolderInput:  $('fit-folder-input'),
+  btnSaveFitFolder: $('btn-save-fit-folder'),
+  fitLibraryStatus: $('fit-library-status'),
+  fitLibraryBanner: $('fit-library-banner')
 };
 
 // ─── API Helpers ────────────────────────────────────────────────────────────
@@ -139,6 +147,19 @@ async function init() {
   els.btnDismissImport.addEventListener('click', () => {
     els.fitImportPanel.classList.add('hidden');
   });
+
+  // Settings modal
+  els.btnSettings?.addEventListener('click', () => {
+    els.settingsModal.classList.remove('hidden');
+    loadFitLibraryStatus();
+  });
+  els.btnCloseSettings?.addEventListener('click', () => {
+    els.settingsModal.classList.add('hidden');
+  });
+  els.settingsModal?.addEventListener('click', (e) => {
+    if (e.target === els.settingsModal) els.settingsModal.classList.add('hidden');
+  });
+  els.btnSaveFitFolder?.addEventListener('click', saveFitFolderSetting);
 
   // Global drag-and-drop for .FIT files
   setupDragAndDrop();
@@ -272,19 +293,19 @@ async function openActivity(activity) {
       state.gearData = gearRes.gears;
     }
 
-    // Show data source + download button + import panel
+    // Show data source + download button
     els.dataSourceBar.classList.remove('hidden');
     els.btnDownloadFit.classList.remove('hidden');
     updateDataSourceBadge();
-
-    // Show the FIT import panel so the user can get actual Di2 data
-    els.fitImportPanel.classList.remove('hidden');
 
     // Render visualizations (with estimated data for now)
     renderMap();
     renderElevationChart();
     renderGearLegend();
     renderGearStats();
+
+    // ── Auto-match Di2 data from FIT Library ──
+    await autoMatchDi2Data(activity);
 
   } catch (err) {
     console.error('Failed to load activity details:', err);
@@ -372,9 +393,12 @@ function getShiftIndices() {
 
 function updateDataSourceBadge() {
   if (state.usingFitData) {
-    const source = state.fitGearData?.source === 'strava_export'
-      ? 'Di2 Actual (from Strava FIT)'
-      : 'Di2 Actual (uploaded FIT)';
+    let source = 'Di2 Actual (uploaded FIT)';
+    if (state.fitGearData?.source === 'fit_library') {
+      source = `Di2 Actual (${state.fitGearData.matched_file || 'auto-matched'})`;
+    } else if (state.fitGearData?.source === 'strava_export') {
+      source = 'Di2 Actual (from Strava FIT)';
+    }
     els.dataSourceBadge.textContent = source;
     els.dataSourceBadge.className = 'badge fit-file';
     els.btnUploadFitDetail.textContent = 'Replace with different FIT';
@@ -388,6 +412,52 @@ function updateDataSourceBadge() {
     els.btnUploadFitDetail.textContent = '📂 Upload FIT for actual Di2 data';
     els.btnUploadFitDetail.classList.add('btn-primary');
     els.btnUploadFitDetail.classList.remove('btn-outline');
+  }
+}
+
+// ─── Settings / FIT Library Helpers ─────────────────────────────────────────
+
+async function loadFitLibraryStatus() {
+  try {
+    const status = await api('/api/fit-library/status');
+    if (els.fitLibraryStatus) {
+      if (status.configured) {
+        els.fitLibraryStatus.textContent = `✅ ${status.fileCount} FIT files indexed in ${status.folder}`;
+        els.fitLibraryStatus.className = 'setting-status success';
+      } else {
+        els.fitLibraryStatus.textContent = 'Using ~/Downloads (default)';
+        els.fitLibraryStatus.className = 'setting-status';
+      }
+    }
+    if (els.fitFolderInput && status.folder) {
+      els.fitFolderInput.value = status.folder;
+    }
+  } catch (err) {
+    console.warn('Failed to load FIT library status:', err);
+  }
+}
+
+async function saveFitFolderSetting() {
+  const folder = els.fitFolderInput?.value?.trim();
+  if (!folder) return;
+
+  try {
+    const result = await api('/api/fit-library/configure', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder })
+    });
+
+    if (result.error) {
+      els.fitLibraryStatus.textContent = `❌ ${result.error}`;
+      els.fitLibraryStatus.className = 'setting-status error';
+    } else {
+      els.fitLibraryStatus.textContent = `✅ ${result.fileCount} FIT files indexed`;
+      els.fitLibraryStatus.className = 'setting-status success';
+    }
+  } catch (err) {
+    els.fitLibraryStatus.textContent = `❌ Failed to save`;
+    els.fitLibraryStatus.className = 'setting-status error';
   }
 }
 
@@ -883,6 +953,136 @@ function renderGearStats() {
       </div>
     </div>
   `).join('');
+}
+
+// ─── Auto-Match Di2 Data from FIT Library ───────────────────────────────────
+
+/**
+ * Try to automatically load Di2 gear data:
+ * 1. Check FIT Library for an already-present matching .FIT file
+ * 2. If not found, trigger Strava FIT download and poll until it appears
+ */
+async function autoMatchDi2Data(activity) {
+  if (!activity?.start_date) return;
+
+  // Show status in import panel
+  showAutoStatus('Checking for Di2 data...');
+
+  try {
+    // Step 1: Check if a matching FIT file already exists
+    const result = await api(`/api/activity/${activity.id}/auto-fit?start_date=${encodeURIComponent(activity.start_date)}`);
+
+    if (result.has_gear_data) {
+      console.log(`[Di2va] Auto-matched Di2 data from FIT library: ${result.matched_file}`);
+      applyAutoMatchResult(result);
+      return;
+    }
+
+    // Step 2: No match — trigger download from Strava and poll
+    console.log('[Di2va] No FIT match yet — triggering Strava download + polling...');
+    showAutoStatus('Downloading FIT from Strava...');
+
+    // Open Strava's export URL (uses browser cookies to authenticate)
+    downloadFitFromStrava();
+
+    // Step 3: Poll for the FIT to appear in ~/Downloads
+    const POLL_INTERVAL = 2000; // 2 seconds
+    const MAX_POLLS = 15;       // 30 seconds max
+    let polls = 0;
+
+    const pollTimer = setInterval(async () => {
+      polls++;
+
+      // Stop if we navigated away from this activity
+      if (state.currentActivity?.id !== activity.id) {
+        clearInterval(pollTimer);
+        return;
+      }
+
+      try {
+        const pollResult = await api(`/api/activity/${activity.id}/auto-fit?start_date=${encodeURIComponent(activity.start_date)}`);
+
+        if (pollResult.has_gear_data) {
+          clearInterval(pollTimer);
+          console.log(`[Di2va] FIT detected after ${polls * 2}s: ${pollResult.matched_file}`);
+          applyAutoMatchResult(pollResult);
+          return;
+        }
+      } catch (err) {
+        console.warn('[Di2va] Poll error:', err.message);
+      }
+
+      if (polls >= MAX_POLLS) {
+        clearInterval(pollTimer);
+        console.log('[Di2va] Polling timed out — showing manual import panel');
+        showManualImportPanel();
+      } else {
+        showAutoStatus(`Waiting for FIT download... (${polls * 2}s)`);
+      }
+    }, POLL_INTERVAL);
+
+  } catch (err) {
+    console.warn('[Di2va] Auto-match failed:', err.message);
+    showManualImportPanel();
+  }
+}
+
+/**
+ * Apply auto-matched Di2 data to the current visualizations.
+ */
+function applyAutoMatchResult(result) {
+  state.fitGearData = result;
+  state.usingFitData = true;
+
+  // Merge FIT gear data with Strava streams
+  mergeFitDataWithStreams(result);
+
+  // Hide import panel, update badge
+  els.fitImportPanel.classList.add('hidden');
+  updateDataSourceBadge();
+
+  // Refresh all visualizations
+  renderActivityStats(state.currentActivity);
+  renderMap();
+  updateElevationChart();
+  renderGearLegend();
+  renderGearStats();
+}
+
+/**
+ * Show an auto-download status message in the import panel area.
+ */
+function showAutoStatus(message) {
+  els.fitImportPanel.classList.remove('hidden');
+  els.fitImportPanel.innerHTML = `
+    <div class="fit-import-content auto-status">
+      <div class="spinner-inline"></div>
+      <span>${message}</span>
+    </div>
+  `;
+}
+
+/**
+ * Revert import panel to manual mode (download + upload buttons).
+ */
+function showManualImportPanel() {
+  els.fitImportPanel.classList.remove('hidden');
+  els.fitImportPanel.innerHTML = `
+    <div class="fit-import-content">
+      <div class="fit-import-icon">⚙️</div>
+      <h3>Get Actual Di2 Gear Data</h3>
+      <p>The automatic FIT download didn't complete. You can try again or upload manually:</p>
+      <div class="fit-import-actions">
+        <button id="btn-download-fit-panel" class="btn btn-strava" onclick="downloadFitFromStrava()">
+          ⬇ Download FIT from Strava
+        </button>
+        <button id="btn-upload-fit-panel" class="btn btn-outline" onclick="document.getElementById('fit-file-input-detail').click()">
+          📂 Choose FIT File
+        </button>
+      </div>
+      <button class="btn btn-sm btn-outline" style="margin-top: 8px" onclick="this.closest('.fit-import-panel').classList.add('hidden')">Skip — use estimated data</button>
+    </div>
+  `;
 }
 
 // ─── Download FIT from Strava (uses browser session cookies) ────────────────

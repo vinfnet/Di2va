@@ -7,6 +7,7 @@ const axios = require('axios');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const FitParser = require('fit-file-parser').default;
 
 const app = express();
@@ -587,6 +588,282 @@ app.post('/api/estimate-gears', express.json(), (req, res) => {
   res.json({ gears: gearData });
 });
 
+// ─── FIT Library — Auto-match FIT files to Strava activities ────────────────
+
+/**
+ * Scan a directory (recursively) for .FIT files and extract their start time
+ * by parsing just the session header. Returns an array of { path, startTime }.
+ *
+ * Results are cached in memory and refreshed when the folder changes.
+ */
+let fitLibraryCache = { folder: null, files: [], scannedAt: 0 };
+
+function getFitFolder() {
+  const configured = (process.env.FIT_FOLDER || '').trim();
+  if (configured) return configured;
+  // Default to ~/Downloads so auto-download from Strava just works
+  const downloads = path.join(os.homedir(), 'Downloads');
+  return fs.existsSync(downloads) ? downloads : '';
+}
+
+function setFitFolder(folder) {
+  process.env.FIT_FOLDER = folder;
+  fitLibraryCache = { folder: null, files: [], scannedAt: 0 }; // invalidate
+
+  // Persist to .env.local
+  const envLocalPath = path.join(__dirname, '.env.local');
+  let content = '';
+  if (fs.existsSync(envLocalPath)) {
+    content = fs.readFileSync(envLocalPath, 'utf8');
+    // Remove existing FIT_FOLDER line
+    content = content.replace(/^FIT_FOLDER=.*\n?/m, '');
+  }
+  content = content.trimEnd() + `\nFIT_FOLDER=${folder}\n`;
+  fs.writeFileSync(envLocalPath, content, { mode: 0o600 });
+}
+
+/**
+ * Recursively find all .fit/.FIT files in a directory.
+ */
+function findFitFiles(dir, maxDepth = 3, depth = 0) {
+  if (depth > maxDepth) return [];
+  const results = [];
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory() && !entry.name.startsWith('.')) {
+        results.push(...findFitFiles(fullPath, maxDepth, depth + 1));
+      } else if (entry.isFile() && /\.fit$/i.test(entry.name)) {
+        results.push(fullPath);
+      }
+    }
+  } catch (err) {
+    // Permission denied or missing dir — skip silently
+  }
+  return results;
+}
+
+/**
+ * Quick-parse a FIT file to extract just the session start time.
+ * Returns a Date or null.
+ */
+function getFitStartTime(filePath) {
+  try {
+    const buf = fs.readFileSync(filePath);
+    // Quick sanity check for FIT header
+    if (buf.length < 14 || buf.toString('ascii', 8, 12) !== '.FIT') return null;
+
+    const parser = new FitParser({ force: true, mode: 'list' });
+    let startTime = null;
+
+    // Synchronous: parse returns via callback immediately for file buffer
+    parser.parse(buf, (err, data) => {
+      if (err) return;
+      // Try session start_time first, then first record timestamp, then file_id time_created
+      if (data.sessions?.[0]?.start_time) {
+        startTime = new Date(data.sessions[0].start_time);
+      } else if (data.records?.[0]?.timestamp) {
+        startTime = new Date(data.records[0].timestamp);
+      } else if (data.file_ids?.[0]?.time_created) {
+        startTime = new Date(data.file_ids[0].time_created);
+      }
+    });
+
+    return startTime;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Scan the configured FIT folder and build an index of files + start times.
+ * Caches for 60 seconds to avoid rescanning on every request.
+ */
+function scanFitLibrary(quiet = false) {
+  const folder = getFitFolder();
+  if (!folder) return [];
+
+  const now = Date.now();
+  // Use short 5-second cache so polling picks up new downloads quickly
+  if (fitLibraryCache.folder === folder && (now - fitLibraryCache.scannedAt) < 5000) {
+    return fitLibraryCache.files;
+  }
+
+  if (!quiet) console.log(`[FIT Library] Scanning ${folder}...`);
+  const fitPaths = findFitFiles(folder);
+  if (!quiet) console.log(`[FIT Library] Found ${fitPaths.length} .FIT files, indexing start times...`);
+
+  const files = [];
+  for (const fp of fitPaths) {
+    const startTime = getFitStartTime(fp);
+    if (startTime && !isNaN(startTime.getTime())) {
+      files.push({ path: fp, startTime });
+    }
+  }
+
+  files.sort((a, b) => b.startTime - a.startTime); // newest first
+  const prevCount = fitLibraryCache.files?.length || 0;
+  fitLibraryCache = { folder, files, scannedAt: now };
+  if (!quiet || files.length !== prevCount) {
+    console.log(`[FIT Library] Indexed ${files.length} files with valid timestamps`);
+  }
+  return files;
+}
+
+/**
+ * Find the FIT file whose start time is closest to the given activity start time.
+ * Returns the file entry or null if nothing within 5 minutes.
+ */
+function findMatchingFit(activityStartTime) {
+  const files = scanFitLibrary();
+  if (files.length === 0) return null;
+
+  const targetMs = new Date(activityStartTime).getTime();
+  if (isNaN(targetMs)) return null;
+
+  let best = null;
+  let bestDiff = Infinity;
+
+  for (const f of files) {
+    const diff = Math.abs(f.startTime.getTime() - targetMs);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = f;
+    }
+  }
+
+  // Accept matches within 5 minutes (Strava sometimes adjusts start time)
+  const MAX_DIFF_MS = 5 * 60 * 1000;
+  if (bestDiff <= MAX_DIFF_MS) {
+    return best;
+  }
+  return null;
+}
+
+// API: Get FIT library status
+app.get('/api/fit-library/status', (req, res) => {
+  const folder = getFitFolder();
+  if (!folder) {
+    return res.json({ configured: false, folder: null, fileCount: 0 });
+  }
+
+  const files = scanFitLibrary();
+  res.json({
+    configured: true,
+    folder,
+    fileCount: files.length,
+    newestFile: files[0]?.startTime || null,
+    oldestFile: files[files.length - 1]?.startTime || null
+  });
+});
+
+// API: Configure FIT library folder
+app.post('/api/fit-library/configure', express.json(), (req, res) => {
+  const { folder } = req.body;
+
+  if (!folder || typeof folder !== 'string') {
+    return res.status(400).json({ error: 'Folder path is required' });
+  }
+
+  const resolved = path.resolve(folder.trim());
+
+  if (!fs.existsSync(resolved)) {
+    return res.status(400).json({ error: `Folder not found: ${resolved}` });
+  }
+
+  if (!fs.statSync(resolved).isDirectory()) {
+    return res.status(400).json({ error: `Not a directory: ${resolved}` });
+  }
+
+  setFitFolder(resolved);
+
+  // Scan immediately to return count
+  const files = scanFitLibrary();
+
+  console.log(`\n✅ FIT Library folder set to: ${resolved} (${files.length} files indexed)`);
+
+  res.json({
+    configured: true,
+    folder: resolved,
+    fileCount: files.length,
+    newestFile: files[0]?.startTime || null,
+    oldestFile: files[files.length - 1]?.startTime || null
+  });
+});
+
+// API: Auto-match a FIT file to a Strava activity by start time
+app.get('/api/activity/:id/auto-fit', async (req, res) => {
+  const folder = getFitFolder();
+  if (!folder) {
+    return res.json({ has_gear_data: false, source: 'fit_library', error: 'FIT library not configured' });
+  }
+
+  // Get activity start time from query param or fetch from Strava
+  let startTime = req.query.start_date;
+
+  if (!startTime) {
+    // Fetch from Strava
+    const token = await ensureValidToken(req);
+    if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+    try {
+      const api = stravaApi(token);
+      const resp = await api.get(`/activities/${req.params.id}`);
+      startTime = resp.data.start_date;
+    } catch (err) {
+      return res.json({ has_gear_data: false, source: 'fit_library', error: 'Failed to fetch activity' });
+    }
+  }
+
+  // Force rescan (quiet mode) so newly-downloaded files are picked up
+  fitLibraryCache.scannedAt = 0;
+  const match = findMatchingFit(startTime);
+  if (!match) {
+    return res.json({
+      has_gear_data: false,
+      source: 'fit_library',
+      error: 'No matching FIT file found for this activity'
+    });
+  }
+
+  console.log(`[FIT Library] Matched activity ${req.params.id} → ${path.basename(match.path)}`);
+
+  // Parse the matched FIT file
+  try {
+    const fileBuffer = fs.readFileSync(match.path);
+    const fitParser = new FitParser({
+      force: true,
+      speedUnit: 'km/h',
+      lengthUnit: 'km',
+      temperatureUnit: 'celsius',
+      elapsedRecordField: true,
+      mode: 'both'
+    });
+
+    fitParser.parse(fileBuffer, (error, data) => {
+      if (error) {
+        return res.json({ has_gear_data: false, source: 'fit_library', error: 'Failed to parse FIT file' });
+      }
+
+      const result = extractDi2Data(data);
+      result.source = 'fit_library';
+      result.matched_file = path.basename(match.path);
+      res.json(result);
+    });
+  } catch (err) {
+    console.error('[FIT Library] Parse error:', err.message);
+    res.json({ has_gear_data: false, source: 'fit_library', error: 'Failed to read FIT file' });
+  }
+});
+
+// API: Rescan FIT library (force cache invalidation)
+app.post('/api/fit-library/rescan', (req, res) => {
+  fitLibraryCache = { folder: null, files: [], scannedAt: 0 };
+  const files = scanFitLibrary();
+  res.json({ fileCount: files.length });
+});
+
 // ─── Setup Page HTML ────────────────────────────────────────────────────────
 
 function getSetupPageHtml() {
@@ -691,6 +968,14 @@ app.listen(PORT, () => {
     console.log(`\n  ⚡ First-time setup required!`);
     console.log(`  → Open http://localhost:${PORT}/setup to configure your Strava API credentials\n`);
   } else {
-    console.log(`  ✅ Strava API configured\n`);
+    console.log(`  ✅ Strava API configured`);
+  }
+
+  const fitFolder = getFitFolder();
+  if (fitFolder) {
+    const files = scanFitLibrary();
+    console.log(`  📂 FIT Library: ${fitFolder} (${files.length} files indexed)\n`);
+  } else {
+    console.log(`  📂 FIT Library: not configured — set via Settings in the app\n`);
   }
 });
