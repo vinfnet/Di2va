@@ -106,8 +106,11 @@ const els = {
   dataSourceBar:   $('data-source-bar'),
   dataSourceBadge: $('data-source-badge'),
   mapContainer:    $('map-container'),
+  elevContainer:   $('elevation-container'),
   elevationChart:  $('elevation-chart'),
   btnResetZoom:    $('btn-reset-zoom'),
+  btnFullscreenMap: $('btn-fullscreen-map'),
+  btnFullscreenElev: $('btn-fullscreen-elevation'),
   gearStatsContainer: $('gear-stats-container'),
   gearStats:       $('gear-stats'),
   hoverInfo:       $('hover-info'),
@@ -186,6 +189,11 @@ async function init() {
   els.toggleCadence.addEventListener('change', () => {
     if (state.chart) updateElevationChart();
   });
+
+  // Fullscreen toggles
+  els.btnFullscreenMap.addEventListener('click', () => toggleFullscreen(els.mapContainer));
+  els.btnFullscreenElev.addEventListener('click', () => toggleFullscreen(els.elevContainer));
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
 
   // Download FIT from Strava (uses browser session)
   els.btnDownloadFit.addEventListener('click', downloadFitFromStrava);
@@ -1089,6 +1097,27 @@ function createElevationGradient(ctx, elevations) {
   gradient.addColorStop(0, 'rgba(252, 76, 2, 0.3)');
   gradient.addColorStop(1, 'rgba(252, 76, 2, 0.02)');
   return gradient;
+}
+
+// ─── Fullscreen Toggle ──────────────────────────────────────────────────────────────
+
+function toggleFullscreen(element) {
+  if (document.fullscreenElement === element) {
+    document.exitFullscreen();
+  } else {
+    element.requestFullscreen();
+  }
+}
+
+function handleFullscreenChange() {
+  // Resize map when entering/exiting fullscreen
+  if (state.map) {
+    setTimeout(() => state.map.invalidateSize(), 100);
+  }
+  // Resize chart when entering/exiting fullscreen
+  if (state.chart) {
+    setTimeout(() => state.chart.resize(), 100);
+  }
 }
 
 // ─── Point Highlighting (Syncs Map & Chart) ─────────────────────────────────

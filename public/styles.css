@@ -511,10 +511,50 @@ a:hover { color: var(--accent-hover); }
 
 /* ─── Map ────────────────────────────────────────────────────────── */
 .map-container {
+  position: relative;
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border);
   margin-bottom: 16px;
+}
+
+.map-container:fullscreen {
+  border-radius: 0;
+  border: none;
+  margin: 0;
+}
+
+.map-container:fullscreen #map {
+  height: 100vh !important;
+}
+
+/* ─── Fullscreen Button ───────────────────────────────────────────── */
+.btn-fullscreen {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-fullscreen:hover {
+  opacity: 1;
+  background: var(--bg-card-hover);
+  color: var(--text);
+}
+
+.elevation-container .btn-fullscreen {
+  position: static;
 }
 
 #map {
@@ -531,7 +571,19 @@ a:hover { color: var(--accent-hover); }
   padding: 20px;
   margin-bottom: 16px;
 }
+.elevation-container:fullscreen {
+  border-radius: 0;
+  border: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
 
+.elevation-container:fullscreen #elevation-chart-wrapper {
+  flex: 1;
+  height: auto !important;
+  max-height: none !important;
+}
 .elevation-header {
   display: flex;
   justify-content: space-between;
