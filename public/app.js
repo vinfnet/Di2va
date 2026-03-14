@@ -1264,8 +1264,15 @@ function renderGearStats() {
     .sort((a, b) => b.count - a.count);
 
   els.gearStatsContainer.classList.remove('hidden');
-  els.gearStats.innerHTML = sorted.map(g => `
-    <div class="gear-stat-card" data-front="${g.front}" data-rear="${g.rear}" data-color="${g.color}">
+
+  // Scale factor: largest gear gets scale 1.0, smallest gets 0.6, linear in between
+  const maxCount = sorted[0].count;
+  const minScale = 0.6;
+
+  els.gearStats.innerHTML = sorted.map(g => {
+    const scale = minScale + (1 - minScale) * (g.count / maxCount);
+    return `
+    <div class="gear-stat-card" data-front="${g.front}" data-rear="${g.rear}" data-color="${g.color}" style="transform: scale(${scale.toFixed(3)}); transform-origin: top left;">
       <div class="gear-stat-color" style="background: ${g.color}"></div>
       <div class="gear-stat-info">
         <h4>${g.key}</h4>
@@ -1275,7 +1282,8 @@ function renderGearStats() {
         </div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   // Attach click handlers to each gear card
   els.gearStats.querySelectorAll('.gear-stat-card').forEach(card => {

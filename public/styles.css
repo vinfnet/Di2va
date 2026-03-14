@@ -665,6 +665,12 @@ a:hover { color: var(--accent-hover); }
 .gear-stats-container h3 {
   font-size: 1rem;
   font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.gear-stats-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
   margin-bottom: 16px;
 }
 
