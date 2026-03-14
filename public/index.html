@@ -288,7 +288,7 @@
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     window.THREE = THREE;
-    THREE.OrbitControls = OrbitControls;
+    window.OrbitControls = OrbitControls;
     // Signal that Three.js is ready, then load app
     window.dispatchEvent(new Event('three-ready'));
   </script>

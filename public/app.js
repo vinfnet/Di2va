@@ -1793,7 +1793,8 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
   container.appendChild(renderer.domElement);
 
   // ── OrbitControls ──
-  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  const OrbitControls = window.OrbitControls || THREE.OrbitControls;
+  const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.minDistance = 8;
@@ -2139,4 +2140,8 @@ function escapeHtml(str) {
 
 // ─── Bootstrap ──────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', init);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
