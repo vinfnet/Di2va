@@ -1,19 +1,38 @@
 # Di2va
 
-Visualize your Shimano Di2 gear shift data from Strava cycling activities — see exactly what gear you were in at every point on a **map** and **elevation profile**.
+**Visualize your Shimano Di2 electronic gear shift data from Strava cycling activities** — see exactly what gear you were in at every point on a map and elevation profile, with interactive gear statistics and a drivetrain visualization.
 
 ![screenshot](https://img.shields.io/badge/status-development-orange)
 
+## Why?
+
+I'm a keen cyclist — nothing serious, very much an amateur — but I'm genuinely interested in the tech side of riding. I run a Shimano Di2 electronic groupset on my bike and became increasingly frustrated that **Strava still does not include Di2 electronic shifter data in its ride analysis**. The gear data is right there in the FIT file uploaded by my bike computer, but Strava just ignores it.
+
+Understanding how I use my gears is really useful to me. Am I cross-chaining? Am I spending all my time in one gear when I could be shifting more? On a long climb, did I run out of gears or was I pacing my shifting well?
+
+I was inspired by **[Di2Stats.com](https://di2stats.com)** — a great service that does something similar. Check it out. Di2va takes a different approach: it runs entirely on your own machine and connects directly to your Strava account via the API.
+
+> **See the [full setup guide with screenshots](docs/SETUP_GUIDE.md)** for step-by-step instructions on connecting to the Strava API, including details of where your data is processed and what is sent where.
+
 ## Features
 
-- **Strava OAuth** — Securely connect your Strava account
+- **Strava OAuth** — Securely connect your Strava account (credentials stored locally, never committed)
 - **Activity Browser** — Browse your rides, filtered to cycling only
 - **Map Overlay** — Route colored by gear selection (front/rear combo)
-- **Elevation Profile** — Interactive Chart.js elevation chart with gear & gradient overlay
-- **Di2 Data from FIT Files** — Upload `.FIT` files from your bike computer for actual Di2 gear shift data
+- **Elevation Profile** — Interactive Chart.js elevation chart with gear & gradient overlay, chart magnifier on hover
+- **Auto-Download FIT Files** — Automatically fetches the original FIT file from Strava's export endpoint
+- **FIT Library Matching** — Optionally point at a folder of FIT files to auto-match by timestamp
+- **Di2 Data from FIT Files** — Parses `.FIT` files for actual Di2 gear shift events from your electronic groupset
 - **Gear Estimation** — When no FIT file is available, estimates gears from cadence + speed
-- **Gear Statistics** — Breakdown of time spent in each gear combination
-- **Interactive Hover** — Hover over the elevation chart to see gear, speed, cadence, power, and gradient at that point; synced with map marker
+- **Gear Statistics** — Breakdown of time spent in each gear combination with colour-coded cards
+- **Interactive Gear Popup** — Click any gear to see an animated SVG drivetrain visualization with the full Dura-Ace 9200 cassette and chainrings
+- **Arrow Key Gear Cycling** — Use left/right arrow keys to step through all gears used in the ride, or click the nav bar chips
+- **Interactive Hover** — Hover over the elevation chart to see gear, speed, cadence, power, and gradient at any point; synced with map marker
+- **Units Switcher** — Toggle between metric and imperial
+
+## Data Privacy
+
+**All data processing happens on your local machine.** Di2va is a local web app running at `localhost:3000`. The only network traffic is between your machine and Strava's API (to fetch your activity data) and CARTO's tile CDN (for map tiles). No data is sent to any other third-party service. See the [setup guide](docs/SETUP_GUIDE.md) for a full data flow diagram.
 
 ## Prerequisites
 
@@ -134,12 +153,12 @@ MIT
 
 ---
 
-## Dev Note: Debugging 3D Gear Rotation with a Screenshot
+<sub>
 
-While building the interactive 3D drivetrain visualization (a Three.js WebGL scene showing the full Shimano cassette and chainrings spinning as if pedalling), I hit a problem that was almost impossible to describe in words: the gears were rotating "incorrectly." They were wobbling and tilting instead of spinning smoothly around their axles — but articulating *exactly* what was wrong in text was surprisingly hard.
+**This code is AI-generated.** Built using [Visual Studio Code](https://code.visualstudio.com/download) with [GitHub Copilot](https://github.com/features/copilot) powered by the **Claude Opus 4.6** model by [Anthropic](https://www.anthropic.com/).
 
-The fix came from something simple: **I took a screenshot of the broken visualization and dropped it straight into the chat session with Claude Opus (via GitHub Copilot in VS Code).**
+Download VS Code: [https://code.visualstudio.com/download](https://code.visualstudio.com/download)
 
-Claude immediately identified the issue from the image — the gear meshes had been tipped 90° by a stale `rotation.x = Math.PI / 2` that put the gear faces into the XZ plane instead of XY. When the rotation groups then spun around Z (the intended axle), the gears wobbled in 3D space instead of spinning flat. A one-line fix.
+**Author:** [vinfnet](https://github.com/vinfnet) — This is a personal project and is not affiliated with, endorsed by, or connected to my employer in any way. I do not endorse any of the technologies, products, or services mentioned (Strava, Shimano, Di2, Garmin, etc.) — I simply find this a useful way to experiment with cycling data and AI-assisted development.
 
-**The takeaway:** for visual/spatial bugs, a screenshot can communicate in an instant what paragraphs of text cannot. Multimodal AI chat (text + images) turns "the gears are rotating wrong" into an immediately diagnosable problem — the model can *see* the 3D orientation mismatch just as a human collaborator would.
+</sub>
