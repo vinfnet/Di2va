@@ -565,6 +565,7 @@ a:hover { color: var(--accent-hover); }
 
 /* ─── Elevation Chart ────────────────────────────────────────────── */
 .elevation-container {
+  position: relative;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -723,18 +724,21 @@ a:hover { color: var(--accent-hover); }
 
 /* ─── Hover Info Panel ───────────────────────────────────────────── */
 .hover-info {
-  position: fixed;
+  position: absolute;
+  top: 48px;
+  left: 20px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 12px 14px;
-  min-width: 180px;
+  padding: 10px 12px;
+  min-width: 170px;
   box-shadow: var(--shadow);
   z-index: 1100;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   pointer-events: none;
   transition: opacity 0.12s ease;
   white-space: nowrap;
+  opacity: 0.92;
 }
 
 .hover-info-row {
