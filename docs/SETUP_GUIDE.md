@@ -66,7 +66,29 @@ You need your own Strava API "application" — this is free and takes about 60 s
 
 ### Step 2 — Install Di2va
 
-Make sure you have **Node.js 18+** installed. Then:
+Make sure you have **Node.js 18+** installed (this includes `npm`). Then:
+
+<details>
+<summary><strong>Don't have Node.js / npm?</strong></summary>
+
+`npm` is the package manager bundled with Node.js — installing Node.js gives you both.
+
+| Method | Command / Link |
+|--------|---------------|
+| **macOS (Homebrew)** | `brew install node` |
+| **macOS / Windows / Linux (installer)** | Download from [https://nodejs.org](https://nodejs.org) (LTS recommended) |
+| **nvm (version manager)** | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh \| bash` then `nvm install --lts` |
+
+After installing, verify both are available:
+
+```bash
+node --version   # should print v18 or higher
+npm --version    # should print 9 or higher
+```
+
+</details>
+
+Then:
 
 ```bash
 git clone https://github.com/vinfnet/Di2va.git
