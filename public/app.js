@@ -1623,7 +1623,8 @@ function gearPath(cx, cy, teeth, outerR, innerR) {
 }
 
 /**
- * Render an SVG drivetrain diagram showing chainrings + cassette.
+ * Render an animated SVG drivetrain diagram showing chainrings + cassette.
+ * Cogs rotate as if pedalling — front at cadence, rear faster by gear ratio.
  */
 function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activeRear, activeColor) {
   const W = 740, H = 400;
@@ -1641,6 +1642,11 @@ function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activ
   // Scale: pixels per tooth
   const SCALE = 2.8;
 
+  // Animation: front pedal period (seconds), rear spins faster by gear ratio
+  const FRONT_DUR = 3;   // ~20 RPM — gentle, easy to see teeth
+  const gearRatio = activeFront / activeRear;
+  const REAR_DUR = (FRONT_DUR / gearRatio).toFixed(3);
+
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" ` +
     `style="width:100%;height:100%;display:block;">`;
 
@@ -1655,7 +1661,7 @@ function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activ
   // ── Background ──
   svg += `<rect width="${W}" height="${H}" fill="#2a2a2a" rx="8"/>`;
 
-  // ── Chain (drawn first, behind cogs) ──
+  // ── Chain (static — represents the tangent path the chain follows) ──
   const activeFrontR = activeFront * SCALE;
   const activeRearR = activeRear * SCALE;
   // Top tangent
@@ -1674,33 +1680,97 @@ function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activ
     `A${activeRearR},${activeRearR} 0 1,0 ${REAR_CX},${REAR_CY - activeRearR}" ` +
     `fill="none" stroke="#ff8800" stroke-width="3" opacity="0.5"/>`;
 
-  // ── Cassette (rear) — stack with slight Y offset for depth ──
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ── REAR CASSETTE (rotating group) ──
+  // ═══════════════════════════════════════════════════════════════════════════
+  svg += `<g>`;
+  svg += `<animateTransform attributeName="transform" type="rotate" ` +
+    `from="0 ${REAR_CX} ${REAR_CY}" to="360 ${REAR_CX} ${REAR_CY}" ` +
+    `dur="${REAR_DUR}s" repeatCount="indefinite"/>`;
+
   const rearSorted = [...allRear].sort((a, b) => b - a); // biggest first (drawn first = behind)
-  rearSorted.forEach((teeth, idx) => {
+  rearSorted.forEach((teeth) => {
     const isActive = teeth === activeRear;
     const inRide = rideRearSet.has(teeth);
     const outerR = teeth * SCALE + SCALE;
     const innerR = teeth * SCALE - SCALE * 0.8;
-    const offsetY = (rearSorted.length - 1 - idx) * 0.8;
-    const cx = REAR_CX;
-    const cy = REAR_CY - offsetY;
 
     const fill = isActive ? activeColor : (inRide ? '#aaaaaa' : '#555555');
     const stroke = isActive ? activeColor : (inRide ? '#cccccc' : '#666666');
     const opacity = isActive ? 1 : (inRide ? 0.85 : 0.3);
     const strokeW = isActive ? 2 : 1;
 
-    svg += `<path d="${gearPath(cx, cy, teeth, outerR, innerR)}" ` +
+    svg += `<path d="${gearPath(REAR_CX, REAR_CY, teeth, outerR, innerR)}" ` +
       `fill="${fill}" fill-opacity="${opacity * 0.35}" ` +
       `stroke="${stroke}" stroke-width="${strokeW}" opacity="${opacity}"` +
       `${isActive ? ' filter="url(#glow)"' : ''}/>`;
 
     // Hub hole
     const hubR = Math.max(5, outerR * 0.12);
-    svg += `<circle cx="${cx}" cy="${cy}" r="${hubR}" fill="url(#hubGrad)" opacity="${opacity}"/>`;
+    svg += `<circle cx="${REAR_CX}" cy="${REAR_CY}" r="${hubR}" fill="url(#hubGrad)" opacity="${opacity}"/>`;
+  });
+  svg += `</g>`; // end rear rotating group
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ── FRONT CHAINRINGS + CRANK (rotating group) ──
+  // ═══════════════════════════════════════════════════════════════════════════
+  svg += `<g>`;
+  svg += `<animateTransform attributeName="transform" type="rotate" ` +
+    `from="0 ${FRONT_CX} ${FRONT_CY}" to="360 ${FRONT_CX} ${FRONT_CY}" ` +
+    `dur="${FRONT_DUR}s" repeatCount="indefinite"/>`;
+
+  const frontSorted = [...allFront].sort((a, b) => b - a); // biggest first
+  frontSorted.forEach((teeth) => {
+    const isActive = teeth === activeFront;
+    const inRide = rideFrontSet.has(teeth);
+    const outerR = teeth * SCALE + SCALE;
+    const innerR = teeth * SCALE - SCALE * 0.8;
+
+    const fill = isActive ? activeColor : (inRide ? '#999999' : '#555555');
+    const stroke = isActive ? activeColor : (inRide ? '#bbbbbb' : '#666666');
+    const opacity = isActive ? 1 : (inRide ? 0.75 : 0.3);
+    const strokeW = isActive ? 2.5 : 1;
+
+    svg += `<path d="${gearPath(FRONT_CX, FRONT_CY, teeth, outerR, innerR)}" ` +
+      `fill="${fill}" fill-opacity="${opacity * 0.3}" ` +
+      `stroke="${stroke}" stroke-width="${strokeW}" opacity="${opacity}"` +
+      `${isActive ? ' filter="url(#glow)"' : ''}/>`;
+
+    // Spider arms (4-arm)
+    for (let s = 0; s < 4; s++) {
+      const angle = (s / 4) * Math.PI * 2 + Math.PI / 8;
+      const armInner = Math.max(12, outerR * 0.15);
+      const armOuter = innerR - 2;
+      svg += `<line x1="${FRONT_CX + Math.cos(angle) * armInner}" y1="${FRONT_CY + Math.sin(angle) * armInner}" ` +
+        `x2="${FRONT_CX + Math.cos(angle) * armOuter}" y2="${FRONT_CY + Math.sin(angle) * armOuter}" ` +
+        `stroke="#555" stroke-width="3" stroke-linecap="round" opacity="${opacity * 0.6}"/>`;
+    }
+
+    // Hub hole
+    const hubR = Math.max(8, outerR * 0.1);
+    svg += `<circle cx="${FRONT_CX}" cy="${FRONT_CY}" r="${hubR}" fill="url(#hubGrad)" opacity="${opacity}"/>`;
   });
 
-  // ── Rear cassette labels (one column to the left) ──
+  // Crank arm (rotates with chainrings)
+  const crankLen = 70;
+  const crankAngle = Math.PI * 0.6;
+  const crankEndX = FRONT_CX + Math.cos(crankAngle) * crankLen;
+  const crankEndY = FRONT_CY + Math.sin(crankAngle) * crankLen;
+  svg += `<line x1="${FRONT_CX}" y1="${FRONT_CY}" x2="${crankEndX}" y2="${crankEndY}" ` +
+    `stroke="#555" stroke-width="6" stroke-linecap="round"/>`;
+  svg += `<circle cx="${crankEndX}" cy="${crankEndY}" r="4" fill="#666"/>`;
+
+  svg += `</g>`; // end front rotating group
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ── STATIC OVERLAYS (axles, labels, callouts) ──
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Axle dots (on top of spinning cogs)
+  svg += `<circle cx="${FRONT_CX}" cy="${FRONT_CY}" r="5" fill="#444"/>`;
+  svg += `<circle cx="${REAR_CX}" cy="${REAR_CY}" r="4" fill="#444"/>`;
+
+  // ── Rear cassette labels (static column to the left) ──
   const rearForLabels = [...allRear].sort((a, b) => b - a);
   const labelX = REAR_CX - allRear[allRear.length - 1] * SCALE - SCALE * 4;
   const labelStartY = REAR_CY - (rearForLabels.length - 1) * 14 / 2;
@@ -1713,7 +1783,6 @@ function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activ
     const sz = isActive ? 13 : 10;
     svg += `<text x="${labelX}" y="${y}" fill="${fill}" font-size="${sz}" ` +
       `font-weight="${fw}" font-family="system-ui,sans-serif" text-anchor="end">${teeth}T</text>`;
-    // Line from label to cog
     if (isActive || inRide) {
       const cogOuterR = teeth * SCALE + SCALE;
       svg += `<line x1="${labelX + 4}" y1="${y - 3}" x2="${REAR_CX - cogOuterR}" y2="${REAR_CY}" ` +
@@ -1721,42 +1790,7 @@ function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activ
     }
   });
 
-  // ── Chainrings (front) — bigger ring behind, smaller in front ──
-  const frontSorted = [...allFront].sort((a, b) => b - a); // biggest first
-  frontSorted.forEach((teeth, idx) => {
-    const isActive = teeth === activeFront;
-    const inRide = rideFrontSet.has(teeth);
-    const outerR = teeth * SCALE + SCALE;
-    const innerR = teeth * SCALE - SCALE * 0.8;
-    const cx = FRONT_CX;
-    const cy = FRONT_CY;
-
-    const fill = isActive ? activeColor : (inRide ? '#999999' : '#555555');
-    const stroke = isActive ? activeColor : (inRide ? '#bbbbbb' : '#666666');
-    const opacity = isActive ? 1 : (inRide ? 0.75 : 0.3);
-    const strokeW = isActive ? 2.5 : 1;
-
-    svg += `<path d="${gearPath(cx, cy, teeth, outerR, innerR)}" ` +
-      `fill="${fill}" fill-opacity="${opacity * 0.3}" ` +
-      `stroke="${stroke}" stroke-width="${strokeW}" opacity="${opacity}"` +
-      `${isActive ? ' filter="url(#glow)"' : ''}/>`;
-
-    // Spider arms (4-arm)
-    for (let s = 0; s < 4; s++) {
-      const angle = (s / 4) * Math.PI * 2 + Math.PI / 8;
-      const armInner = Math.max(12, outerR * 0.15);
-      const armOuter = innerR - 2;
-      svg += `<line x1="${cx + Math.cos(angle) * armInner}" y1="${cy + Math.sin(angle) * armInner}" ` +
-        `x2="${cx + Math.cos(angle) * armOuter}" y2="${cy + Math.sin(angle) * armOuter}" ` +
-        `stroke="#555" stroke-width="3" stroke-linecap="round" opacity="${opacity * 0.6}"/>`;
-    }
-
-    // Hub hole
-    const hubR = Math.max(8, outerR * 0.1);
-    svg += `<circle cx="${cx}" cy="${cy}" r="${hubR}" fill="url(#hubGrad)" opacity="${opacity}"/>`;
-  });
-
-  // ── Chainring labels ──
+  // ── Chainring labels (static, above the cogs) ──
   allFront.forEach((teeth) => {
     const isActive = teeth === activeFront;
     const inRide = rideFrontSet.has(teeth);
@@ -1768,19 +1802,6 @@ function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activ
       `font-size="${sz}" font-weight="${fw}" font-family="system-ui,sans-serif" ` +
       `text-anchor="middle">${teeth}T</text>`;
   });
-
-  // ── Crank arm ──
-  const crankLen = 70;
-  const crankAngle = Math.PI * 0.6;
-  const crankEndX = FRONT_CX + Math.cos(crankAngle) * crankLen;
-  const crankEndY = FRONT_CY + Math.sin(crankAngle) * crankLen;
-  svg += `<line x1="${FRONT_CX}" y1="${FRONT_CY}" x2="${crankEndX}" y2="${crankEndY}" ` +
-    `stroke="#555" stroke-width="6" stroke-linecap="round"/>`;
-  svg += `<circle cx="${crankEndX}" cy="${crankEndY}" r="4" fill="#666"/>`;
-
-  // ── Axle dots ──
-  svg += `<circle cx="${FRONT_CX}" cy="${FRONT_CY}" r="5" fill="#444"/>`;
-  svg += `<circle cx="${REAR_CX}" cy="${REAR_CY}" r="4" fill="#444"/>`;
 
   // ── Section labels ──
   svg += `<text x="${FRONT_CX}" y="${H - 15}" fill="#888" font-size="13" ` +
