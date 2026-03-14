@@ -164,6 +164,48 @@ If Di2va can't automatically download the FIT file from Strava (this depends on 
 
 ---
 
+## FIT Files — Why They're Needed and Privacy Considerations
+
+### Why FIT files?
+
+Strava's API provides activity data like GPS coordinates, elevation, cadence, speed, and power — but it **does not include Di2 electronic gear shift data**. That information is only recorded in the **original FIT file** uploaded by your bike computer (Garmin, Wahoo, etc.).
+
+The FIT (Flexible and Interoperable Data Transfer) file is a binary format developed by Garmin that stores every data point your bike computer records during a ride. Di2va needs access to this file to extract the gear change events that the Shimano Di2 system logs.
+
+### How Di2va gets FIT files
+
+Di2va tries to obtain the FIT file automatically, in this order:
+
+1. **FIT Library match** — If you've configured a FIT library folder (e.g. `~/Downloads`), Di2va scans it for a file whose timestamp matches the Strava activity
+2. **Strava API export** — Di2va's server fetches the original file via Strava's `export_original` endpoint using your OAuth token. This happens server-side — no browser popup or download notification appears
+3. **Hidden browser download** — If the API approach fails (this endpoint isn't officially supported by Strava), a silent background download is attempted using your browser's Strava session cookies
+4. **Manual upload** — You can always drag-and-drop or upload a FIT file manually
+
+### What's in a FIT file — privacy warning
+
+> **⚠️ FIT files contain privacy-sensitive data.** Treat them like you would your location history.
+
+A typical cycling FIT file contains:
+
+| Data | Privacy concern |
+|------|----------------|
+| **GPS coordinates** | Your exact route, including start/end locations (often your home) |
+| **Timestamps** | Exact times you were at each location |
+| **Heart rate** | Personal health/biometric data |
+| **Power output** | Personal fitness data |
+| **Device serial numbers** | Identifies your specific bike computer and sensors |
+| **Di2 gear shifts** | Not particularly sensitive, but linked to all the above |
+
+### Recommendations
+
+- **Don't share FIT files publicly** unless you've stripped GPS data or are comfortable with the location data being visible
+- **Be careful with the FIT Library folder** — if you point Di2va at a folder, it indexes all `.fit` files in it. Make sure it doesn't contain files you don't want processed
+- **Di2va never uploads your FIT files anywhere** — they are read and parsed locally on your machine. The parsed gear data stays in your browser session and is never sent to any external service
+- **Clean up downloads** — if Di2va downloads a FIT file from Strava to your `~/Downloads` folder, it stays there. Delete it when you're done if you prefer not to keep raw FIT files on disk
+- **Strava's own privacy controls** still apply — Di2va can only access activities that your Strava privacy settings allow the API to read
+
+---
+
 ## Troubleshooting
 
 | Problem | Solution |
