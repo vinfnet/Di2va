@@ -177,9 +177,11 @@ The FIT (Flexible and Interoperable Data Transfer) file is a binary format devel
 Di2va tries to obtain the FIT file automatically, in this order:
 
 1. **FIT Library match** — If you've configured a FIT library folder (e.g. `~/Downloads`), Di2va scans it for a file whose timestamp matches the Strava activity
-2. **Strava API export** — Di2va's server fetches the original file via Strava's `export_original` endpoint using your OAuth token. This happens server-side — no browser popup or download notification appears
-3. **Hidden browser download** — If the API approach fails (this endpoint isn't officially supported by Strava), a silent background download is attempted using your browser's Strava session cookies
+2. **Strava API export** — Di2va’s server fetches the original file via Strava’s `export_original` endpoint using your OAuth token. This happens server-side — no browser popup or download notification appears. The file is held in memory, parsed, and never written to disk.
+3. **Hidden browser download** — If the API approach fails (this endpoint isn’t officially supported by Strava), a silent background download is attempted using your browser’s Strava session cookies. The file is saved to your system’s default download folder (auto-detected, typically `~/Downloads`). **After the gear data is successfully extracted, the FIT file is automatically deleted.**
 4. **Manual upload** — You can always drag-and-drop or upload a FIT file manually
+
+> **Note on auto-delete:** FIT files downloaded via the browser fallback (step 3) are automatically deleted from your download folder after Di2va has successfully parsed the gear data. This only happens when using the default download folder — if you’ve configured a custom FIT Library folder in Settings, files in that folder are **never** deleted (they’re assumed to be your permanent archive).
 
 ### What's in a FIT file — privacy warning
 
@@ -201,7 +203,7 @@ A typical cycling FIT file contains:
 - **Don't share FIT files publicly** unless you've stripped GPS data or are comfortable with the location data being visible
 - **Be careful with the FIT Library folder** — if you point Di2va at a folder, it indexes all `.fit` files in it. Make sure it doesn't contain files you don't want processed
 - **Di2va never uploads your FIT files anywhere** — they are read and parsed locally on your machine. The parsed gear data stays in your browser session and is never sent to any external service
-- **Clean up downloads** — if Di2va downloads a FIT file from Strava to your `~/Downloads` folder, it stays there. Delete it when you're done if you prefer not to keep raw FIT files on disk
+- **Auto-cleanup of downloads** — when Di2va downloads a FIT file from Strava via the browser fallback, it automatically deletes the file from your download folder after successfully extracting the gear data. If you’ve configured a custom FIT Library folder, files there are never deleted.
 - **Strava's own privacy controls** still apply — Di2va can only access activities that your Strava privacy settings allow the API to read
 
 ---

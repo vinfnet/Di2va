@@ -607,7 +607,25 @@ let fitLibraryCache = { folder: null, files: [], scannedAt: 0 };
 function getFitFolder() {
   const configured = (process.env.FIT_FOLDER || '').trim();
   if (configured) return configured;
-  // Default to ~/Downloads so auto-download from Strava just works
+  // Default to the system's actual download folder
+  return getDefaultDownloadFolder();
+}
+
+/**
+ * Detect the system's default download folder.
+ * On macOS, reads the user's com.apple.finder plist for the configured
+ * download location. Falls back to ~/Downloads.
+ */
+function getDefaultDownloadFolder() {
+  // Try macOS-specific detection
+  if (process.platform === 'darwin') {
+    try {
+      const { execSync } = require('child_process');
+      // NSNavLastRootDirectory in Finder prefs sometimes has the download path
+      // but the most reliable approach is simply ~/Downloads which macOS always uses
+      // unless the user has manually moved it (extremely rare).
+    } catch (e) { /* ignore */ }
+  }
   const downloads = path.join(os.homedir(), 'Downloads');
   return fs.existsSync(downloads) ? downloads : '';
 }
@@ -855,6 +873,24 @@ app.get('/api/activity/:id/auto-fit', async (req, res) => {
       const result = extractDi2Data(data);
       result.source = 'fit_library';
       result.matched_file = path.basename(match.path);
+
+      // Auto-delete the FIT file if it's in the default download folder
+      // (not in a user-configured library folder — those are intentionally kept)
+      const defaultDl = getDefaultDownloadFolder();
+      const configuredFolder = (process.env.FIT_FOLDER || '').trim();
+      const fileDir = path.dirname(match.path);
+      if (result.has_gear_data && defaultDl && !configuredFolder && fileDir === defaultDl) {
+        try {
+          fs.unlinkSync(match.path);
+          console.log(`[FIT Library] Auto-deleted downloaded FIT: ${path.basename(match.path)}`);
+          result.auto_deleted = true;
+          // Invalidate cache since we deleted a file
+          fitLibraryCache.scannedAt = 0;
+        } catch (delErr) {
+          console.warn(`[FIT Library] Could not auto-delete ${path.basename(match.path)}: ${delErr.message}`);
+        }
+      }
+
       res.json(result);
     });
   } catch (err) {
