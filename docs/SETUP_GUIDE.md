@@ -312,6 +312,22 @@ To add screenshots: take them while following the steps above and save them in `
 
 ---
 
+## Tested On
+
+This project has been developed and tested with the following setup:
+
+| Component | Version / Model |
+|-----------|----------------|
+| **Operating System** | macOS 26.3 (Tahoe) |
+| **Editor** | Visual Studio Code 1.109.5 |
+| **Head Unit** | Garmin Edge 540 |
+| **Groupset** | Shimano Di2 Ultegra |
+| **Platform** | Strava |
+
+> Other Shimano Di2 groupsets (Dura-Ace, 105) and Garmin head units that record Di2 shifting events to FIT files should also work, but have not been explicitly tested.
+
+---
+
 <sub>
 
 **About this project:** This is entirely AI-generated code, built using [Visual Studio Code](https://code.visualstudio.com/download) with [GitHub Copilot](https://github.com/features/copilot) powered by the **Claude Opus 4.6** model by [Anthropic](https://www.anthropic.com/).
