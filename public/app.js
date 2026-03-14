@@ -267,10 +267,30 @@ async function loadActivities() {
 function renderActivities() {
   els.activitiesList.innerHTML = '';
 
-  state.activities.forEach(activity => {
-    const card = document.createElement('div');
-    card.className = 'activity-card';
-    card.addEventListener('click', () => openActivity(activity));
+  // Sort activities by date descending (most recent first)
+  const sorted = [...state.activities].sort((a, b) =>
+    new Date(b.start_date_local) - new Date(a.start_date_local)
+  );
+
+  const table = document.createElement('table');
+  table.className = 'activities-table';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th class="col-date">Date</th>
+        <th class="col-name">Ride</th>
+        <th class="col-dist">Distance</th>
+        <th class="col-elev">Elevation</th>
+        <th class="col-time">Time</th>
+      </tr>
+    </thead>
+  `;
+  const tbody = document.createElement('tbody');
+
+  sorted.forEach(activity => {
+    const row = document.createElement('tr');
+    row.className = 'activity-row';
+    row.addEventListener('click', () => openActivity(activity));
 
     const date = new Date(activity.start_date_local);
     const distance = distFromMetres(activity.distance).toFixed(1);
@@ -279,30 +299,20 @@ function renderActivities() {
     const hasGearIndicator = activity.device_name?.toLowerCase().includes('di2') ||
                              activity.gear_id ? '⚙️ ' : '';
 
-    card.innerHTML = `
-      <div class="activity-card-header">
-        <h3>${hasGearIndicator}${escapeHtml(activity.name)}</h3>
-        <span class="date">${date.toLocaleDateString('en-GB', {
-          day: 'numeric', month: 'short', year: 'numeric'
-        })}</span>
-      </div>
-      <div class="activity-card-stats">
-        <div class="activity-stat">
-          <div class="value">${distance}<small> ${distUnit()}</small></div>
-          <div class="label">Distance</div>
-        </div>
-        <div class="activity-stat">
-          <div class="value">${elevation}<small> ${elevUnit()}</small></div>
-          <div class="label">Elevation</div>
-        </div>
-        <div class="activity-stat">
-          <div class="value">${duration}</div>
-          <div class="label">Time</div>
-        </div>
-      </div>
+    row.innerHTML = `
+      <td class="col-date">${date.toLocaleDateString('en-GB', {
+        day: 'numeric', month: 'short', year: 'numeric'
+      })}</td>
+      <td class="col-name">${hasGearIndicator}${escapeHtml(activity.name)}</td>
+      <td class="col-dist">${distance} <small>${distUnit()}</small></td>
+      <td class="col-elev">${elevation} <small>${elevUnit()}</small></td>
+      <td class="col-time">${duration}</td>
     `;
-    els.activitiesList.appendChild(card);
+    tbody.appendChild(row);
   });
+
+  table.appendChild(tbody);
+  els.activitiesList.appendChild(table);
 }
 
 // ─── Open Activity Detail ───────────────────────────────────────────────────
