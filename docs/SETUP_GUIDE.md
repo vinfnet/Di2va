@@ -115,6 +115,8 @@ You'll see:
 
 Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
+> **Important:** Make sure you are also **logged into Strava** in the same browser. Di2va uses OAuth to pull in your activity list, but FIT file downloads require an active Strava browser session. If you're not logged in, gear data from FIT files won't be available.
+
 ---
 
 ### Step 4 — Enter Your Strava Credentials
