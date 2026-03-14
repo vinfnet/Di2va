@@ -532,8 +532,12 @@ function renderMap() {
 
   // Create map
   state.map = L.map('map', {
-    zoomControl: true,
-    scrollWheelZoom: true
+    zoomControl: false,
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
+    boxZoom: false,
+    touchZoom: false,
+    keyboard: false
   });
 
   // Dark tile layer
