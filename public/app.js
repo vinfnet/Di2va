@@ -1759,6 +1759,7 @@ function createLabel(text, position, color, size) {
 
 /**
  * Main 3D drivetrain renderer using Three.js.
+ * Cogs rotate as if pedalling; camera offset from drive side.
  */
 function renderDrivetrain3D(container, chainrings, cassette, activeFront, activeRear, activeColor) {
   // Cleanup previous
@@ -1776,11 +1777,12 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
   // ── Scene ──
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x080808);
+  scene.fog = new THREE.FogExp2(0x080808, 0.018);
 
-  // ── Camera ──
-  const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 200);
-  camera.position.set(0, 6, 18);
-  camera.lookAt(0, 0, 0);
+  // ── Camera — offset from drive side (slightly right + above) ──
+  const camera = new THREE.PerspectiveCamera(36, W / H, 0.1, 200);
+  camera.position.set(2, 5, 20);   // shifted right (Z-axis is drive side)
+  camera.lookAt(0, -0.5, 0);
 
   // ── Renderer ──
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -1789,217 +1791,263 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.1;
+  renderer.toneMappingExposure = 1.2;
   container.appendChild(renderer.domElement);
 
   // ── OrbitControls ──
-  const OrbitControls = window.OrbitControls || THREE.OrbitControls;
-  const controls = new OrbitControls(camera, renderer.domElement);
+  const OC = window.OrbitControls || THREE.OrbitControls;
+  const controls = new OC(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.minDistance = 8;
-  controls.maxDistance = 40;
-  controls.target.set(0, 0, 0);
-  controls.maxPolarAngle = Math.PI * 0.85;
+  controls.minDistance = 6;
+  controls.maxDistance = 45;
+  controls.target.set(0, -0.5, 0);
+  controls.maxPolarAngle = Math.PI * 0.88;
 
   // ── Lighting ──
-  const ambientLight = new THREE.AmbientLight(0x404050, 0.6);
-  scene.add(ambientLight);
+  scene.add(new THREE.AmbientLight(0x404050, 0.5));
 
-  const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
-  keyLight.position.set(8, 12, 10);
+  const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
+  keyLight.position.set(6, 14, 12);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.set(1024, 1024);
+  keyLight.shadow.camera.near = 1;
+  keyLight.shadow.camera.far = 40;
   scene.add(keyLight);
 
-  const fillLight = new THREE.DirectionalLight(0x6688cc, 0.5);
-  fillLight.position.set(-6, 4, -8);
+  const fillLight = new THREE.DirectionalLight(0x7799cc, 0.4);
+  fillLight.position.set(-8, 3, -6);
   scene.add(fillLight);
 
-  const rimLight = new THREE.PointLight(0xffffff, 0.4, 30);
-  rimLight.position.set(0, -5, 10);
+  const rimLight = new THREE.PointLight(0xffffff, 0.5, 35);
+  rimLight.position.set(0, -4, 14);
   scene.add(rimLight);
 
   // ── Parse active colour ──
   const activeThreeColor = new THREE.Color(activeColor);
 
   // ── Materials ──
-  const steelMat = new THREE.MeshStandardMaterial({
-    color: 0x8a8a8a,
-    metalness: 0.85,
-    roughness: 0.25,
+  const steelMat = () => new THREE.MeshStandardMaterial({
+    color: 0x8a8a8a, metalness: 0.85, roughness: 0.22
   });
-  const steelDarkMat = new THREE.MeshStandardMaterial({
-    color: 0x555555,
-    metalness: 0.8,
-    roughness: 0.3,
+  const steelDarkMat = () => new THREE.MeshStandardMaterial({
+    color: 0x555555, metalness: 0.82, roughness: 0.28
   });
-  const activeMat = new THREE.MeshStandardMaterial({
-    color: activeThreeColor,
-    metalness: 0.75,
-    roughness: 0.2,
-    emissive: activeThreeColor,
-    emissiveIntensity: 0.35,
+  const activeMat = () => new THREE.MeshStandardMaterial({
+    color: activeThreeColor, metalness: 0.75, roughness: 0.18,
+    emissive: activeThreeColor, emissiveIntensity: 0.4
+  });
+  const ghostMat = () => new THREE.MeshStandardMaterial({
+    color: 0x444444, metalness: 0.7, roughness: 0.35,
+    transparent: true, opacity: 0.35
   });
   const axleMat = new THREE.MeshStandardMaterial({
-    color: 0x333333,
-    metalness: 0.9,
-    roughness: 0.15,
+    color: 0x2a2a2a, metalness: 0.92, roughness: 0.12
   });
   const crankMat = new THREE.MeshStandardMaterial({
-    color: 0x222222,
-    metalness: 0.85,
-    roughness: 0.2,
+    color: 0x1a1a1a, metalness: 0.88, roughness: 0.18
   });
 
   // ── Geometry constants ──
-  const MODULE = 0.18;        // scaling factor
-  const COG_SPACING = 0.35;   // axial gap between cassette cogs
-  const CHAINRING_GAP = 0.8;  // axial gap between chainrings
-  const FRONT_X = -5.5;       // chainring X
-  const REAR_X = 5.5;         // cassette X
+  const MODULE = 0.18;
+  const COG_SPACING = 0.32;
+  const CHAINRING_GAP = 0.75;
+  const FRONT_X = -5.5;
+  const REAR_X = 5.5;
 
-  // ── Drivetrain group ──
+  // ── Full Dura-Ace 9200-style groupset ──
+  // Use actual ride data for chainrings/cassette, but also define full groupset
+  const FULL_CASSETTE_12S = [11, 12, 13, 14, 15, 17, 19, 21, 24, 27, 30, 34];
+  const FULL_CHAINRINGS_2X = [34, 50];
+
+  // Merge ride data with standard groupset to show all cogs
+  const allRear = [...new Set([...cassette, ...FULL_CASSETTE_12S])].sort((a, b) => a - b);
+  const allFront = [...new Set([...chainrings, ...FULL_CHAINRINGS_2X])].sort((a, b) => a - b);
+  // Which cogs were actually used in the ride
+  const rideRearSet = new Set(cassette);
+  const rideFrontSet = new Set(chainrings);
+
+  // ── Rotating groups — everything on each axle rotates together ──
+  const frontRotGroup = new THREE.Group();
+  frontRotGroup.position.set(FRONT_X, 0, 0);
+
+  const rearRotGroup = new THREE.Group();
+  rearRotGroup.position.set(REAR_X, 0, 0);
+
+  // Static group for axles, labels, etc.
   const drivetrain = new THREE.Group();
 
   // ── Rear cassette ──
-  const cassetteSorted = [...cassette].sort((a, b) => a - b); // smallest first
-  const cassetteWidth = (cassetteSorted.length - 1) * COG_SPACING;
+  const cassetteWidth = (allRear.length - 1) * COG_SPACING;
   const cassetteStartZ = -cassetteWidth / 2;
 
-  cassetteSorted.forEach((teeth, idx) => {
+  allRear.forEach((teeth, idx) => {
     const isActive = teeth === activeRear;
+    const inRide = rideRearSet.has(teeth);
     const pitchR = (teeth * MODULE) / 2;
-    const thickness = isActive ? 0.28 : 0.2;
+    const thickness = isActive ? 0.28 : 0.18;
     const holeR = Math.max(0.4, pitchR * 0.2);
-    const mat = isActive ? activeMat.clone() : steelMat.clone();
 
-    if (!isActive) {
-      // Vary darkness slightly per cog for visual depth
-      const shade = 0.55 + idx * 0.03;
+    let mat;
+    if (isActive) mat = activeMat();
+    else if (inRide) mat = steelMat();
+    else mat = ghostMat();
+
+    if (!isActive && inRide) {
+      const shade = 0.50 + idx * 0.025;
       mat.color.setRGB(shade, shade, shade);
     }
 
     const cog = createGearMesh(teeth, MODULE, thickness, holeR, mat);
-    cog.position.set(REAR_X, 0, cassetteStartZ + idx * COG_SPACING);
+    // Position relative to group centre (which is at REAR_X, 0, 0)
+    cog.position.set(0, 0, cassetteStartZ + idx * COG_SPACING);
     cog.castShadow = true;
     cog.receiveShadow = true;
-    drivetrain.add(cog);
+    rearRotGroup.add(cog);
 
-    // Label
-    const labelZ = cassetteStartZ + idx * COG_SPACING;
-    const labelR = pitchR + MODULE * 2.5;
+    // Label (static, above the cog)
+    const labelR = pitchR + MODULE * 2.8;
+    const labelColor = isActive ? activeColor : (inRide ? '#999999' : '#555555');
+    const labelSize = isActive ? 1.5 : (inRide ? 1.0 : 0.8);
     drivetrain.add(createLabel(
       `${teeth}T`,
-      new THREE.Vector3(REAR_X, labelR + 0.3, labelZ),
-      isActive ? activeColor : '#888888',
-      isActive ? 1.6 : 1.1
+      new THREE.Vector3(REAR_X, labelR + 0.3, cassetteStartZ + idx * COG_SPACING),
+      labelColor, labelSize
     ));
   });
 
   // Rear axle
-  const rearAxleGeo = new THREE.CylinderGeometry(0.25, 0.25, cassetteWidth + 1.5, 16);
+  const rearAxleGeo = new THREE.CylinderGeometry(0.22, 0.22, cassetteWidth + 2, 16);
   const rearAxle = new THREE.Mesh(rearAxleGeo, axleMat);
   rearAxle.rotation.x = Math.PI / 2;
   rearAxle.position.set(REAR_X, 0, 0);
   drivetrain.add(rearAxle);
 
   // Rear hub body
-  const hubGeo = new THREE.CylinderGeometry(0.7, 0.6, cassetteWidth * 0.8, 12);
+  const hubGeo = new THREE.CylinderGeometry(0.65, 0.55, cassetteWidth * 0.7, 16);
   const hubMesh = new THREE.Mesh(hubGeo, axleMat);
   hubMesh.rotation.x = Math.PI / 2;
   hubMesh.position.set(REAR_X, 0, 0);
   drivetrain.add(hubMesh);
 
+  // Rear hub flanges
+  [-1, 1].forEach(side => {
+    const flangeGeo = new THREE.CylinderGeometry(0.9, 0.8, 0.15, 16);
+    const flange = new THREE.Mesh(flangeGeo, axleMat);
+    flange.rotation.x = Math.PI / 2;
+    flange.position.set(REAR_X, 0, side * cassetteWidth * 0.38);
+    drivetrain.add(flange);
+  });
+
   // ── Front chainrings ──
-  const chainSorted = [...chainrings].sort((a, b) => a - b); // smallest first
-  const chainWidth = (chainSorted.length - 1) * CHAINRING_GAP;
+  const chainWidth = (allFront.length - 1) * CHAINRING_GAP;
   const chainStartZ = -chainWidth / 2;
 
-  chainSorted.forEach((teeth, idx) => {
+  allFront.forEach((teeth, idx) => {
     const isActive = teeth === activeFront;
+    const inRide = rideFrontSet.has(teeth);
     const pitchR = (teeth * MODULE) / 2;
-    const thickness = isActive ? 0.35 : 0.25;
+    const thickness = isActive ? 0.30 : 0.22;
     const holeR = Math.max(0.8, pitchR * 0.22);
-    const mat = isActive ? activeMat.clone() : steelDarkMat.clone();
+
+    let mat;
+    if (isActive) mat = activeMat();
+    else if (inRide) mat = steelDarkMat();
+    else mat = ghostMat();
 
     const ring = createGearMesh(teeth, MODULE, thickness, holeR, mat);
-    ring.position.set(FRONT_X, 0, chainStartZ + idx * CHAINRING_GAP);
+    ring.position.set(0, 0, chainStartZ + idx * CHAINRING_GAP);
     ring.castShadow = true;
     ring.receiveShadow = true;
-    drivetrain.add(ring);
+    frontRotGroup.add(ring);
 
-    // Spider arms (radial struts connecting to crank axle)
+    // Spider arms (4-arm spider, rotate with the chainring)
     const spiderCount = 4;
     for (let s = 0; s < spiderCount; s++) {
       const angle = (s / spiderCount) * Math.PI * 2;
-      const armLen = holeR + 0.2;
-      const armGeo = new THREE.BoxGeometry(armLen, 0.12, thickness * 0.6);
+      const armLen = holeR + 0.3;
+      const armGeo = new THREE.BoxGeometry(armLen, 0.14, thickness * 0.55);
       const arm = new THREE.Mesh(armGeo, crankMat);
       arm.position.set(
-        FRONT_X + Math.cos(angle) * armLen / 2,
+        Math.cos(angle) * armLen / 2,
         Math.sin(angle) * armLen / 2,
         chainStartZ + idx * CHAINRING_GAP
       );
       arm.rotation.z = angle;
-      drivetrain.add(arm);
+      frontRotGroup.add(arm);
     }
 
-    // Label
-    const labelR = pitchR + MODULE * 2.5;
+    // Label (static)
+    const labelR = pitchR + MODULE * 2.8;
+    const labelColor = isActive ? activeColor : (inRide ? '#999999' : '#555555');
+    const labelSize = isActive ? 1.7 : (inRide ? 1.2 : 0.9);
     drivetrain.add(createLabel(
       `${teeth}T`,
       new THREE.Vector3(FRONT_X, labelR + 0.3, chainStartZ + idx * CHAINRING_GAP),
-      isActive ? activeColor : '#888888',
-      isActive ? 1.8 : 1.3
+      labelColor, labelSize
     ));
   });
 
-  // Front axle + crank boss
-  const frontAxleGeo = new THREE.CylinderGeometry(0.35, 0.35, chainWidth + 2, 16);
-  const frontAxle = new THREE.Mesh(frontAxleGeo, axleMat);
-  frontAxle.rotation.x = Math.PI / 2;
-  frontAxle.position.set(FRONT_X, 0, 0);
-  drivetrain.add(frontAxle);
+  // Front BB axle
+  const bbLen = chainWidth + 3;
+  const bbGeo = new THREE.CylinderGeometry(0.32, 0.32, bbLen, 16);
+  const bbAxle = new THREE.Mesh(bbGeo, axleMat);
+  bbAxle.rotation.x = Math.PI / 2;
+  bbAxle.position.set(FRONT_X, 0, 0);
+  drivetrain.add(bbAxle);
 
-  // ── Crank arm ──
+  // BB shell
+  const bbShellGeo = new THREE.CylinderGeometry(0.55, 0.55, 1.2, 16);
+  const bbShell = new THREE.Mesh(bbShellGeo, axleMat);
+  bbShell.rotation.x = Math.PI / 2;
+  bbShell.position.set(FRONT_X, 0, 0);
+  drivetrain.add(bbShell);
+
+  // ── Crank arms (rotate with front group) ──
   const crankLen = 4.5;
-  const crankGeo = new THREE.BoxGeometry(0.45, crankLen, 0.22);
-  crankGeo.translate(0, -crankLen / 2, 0);
-  const crankArm = new THREE.Mesh(crankGeo, crankMat);
-  crankArm.position.set(FRONT_X, 0, chainWidth / 2 + 0.8);
-  crankArm.rotation.z = Math.PI * 0.15; // slight angle
-  drivetrain.add(crankArm);
 
-  // Pedal spindle
-  const pedalGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.2, 8);
-  pedalGeo.rotateX(Math.PI / 2);
-  const pedal = new THREE.Mesh(pedalGeo, axleMat);
-  const crankTip = new THREE.Vector3(
-    FRONT_X + Math.sin(Math.PI * 0.15) * crankLen,
-    -Math.cos(Math.PI * 0.15) * crankLen,
-    chainWidth / 2 + 0.8
-  );
-  pedal.position.copy(crankTip);
-  drivetrain.add(pedal);
+  // Drive side crank
+  const driveGeo = new THREE.BoxGeometry(0.5, crankLen, 0.2);
+  driveGeo.translate(0, -crankLen / 2, 0);
+  const driveCrank = new THREE.Mesh(driveGeo, crankMat);
+  driveCrank.position.set(0, 0, chainWidth / 2 + 1.0);
+  frontRotGroup.add(driveCrank);
 
-  // Pedal body
-  const pedalBodyGeo = new THREE.BoxGeometry(0.4, 0.12, 1.2);
-  const pedalBody = new THREE.Mesh(pedalBodyGeo, steelDarkMat);
-  pedalBody.position.copy(crankTip);
-  pedalBody.position.z += 0.7;
-  drivetrain.add(pedalBody);
+  // Drive side pedal spindle + body
+  const pedalSpindleGeo = new THREE.CylinderGeometry(0.1, 0.1, 1.4, 8);
+  pedalSpindleGeo.rotateX(Math.PI / 2);
+  const pedalSpindle = new THREE.Mesh(pedalSpindleGeo, axleMat);
+  pedalSpindle.position.set(0, -crankLen, chainWidth / 2 + 1.0);
+  frontRotGroup.add(pedalSpindle);
+
+  const pedalBodyGeo = new THREE.BoxGeometry(0.4, 0.1, 1.3);
+  const pedalBody = new THREE.Mesh(pedalBodyGeo, steelDarkMat());
+  pedalBody.position.set(0, -crankLen, chainWidth / 2 + 1.7);
+  frontRotGroup.add(pedalBody);
+
+  // Non-drive side crank (opposite direction)
+  const ndGeo = new THREE.BoxGeometry(0.5, crankLen, 0.2);
+  ndGeo.translate(0, crankLen / 2, 0);  // opposite direction
+  const ndCrank = new THREE.Mesh(ndGeo, crankMat);
+  ndCrank.position.set(0, 0, -chainWidth / 2 - 1.0);
+  frontRotGroup.add(ndCrank);
+
+  // Non-drive pedal
+  const ndPedalSpindle = new THREE.Mesh(pedalSpindleGeo.clone(), axleMat);
+  ndPedalSpindle.position.set(0, crankLen, -chainWidth / 2 - 1.0);
+  frontRotGroup.add(ndPedalSpindle);
+
+  const ndPedalBody = new THREE.Mesh(pedalBodyGeo.clone(), steelDarkMat());
+  ndPedalBody.position.set(0, crankLen, -chainWidth / 2 - 1.7);
+  frontRotGroup.add(ndPedalBody);
 
   // ── Chain ──
   const activeFrontR = (activeFront * MODULE) / 2;
   const activeRearR = (activeRear * MODULE) / 2;
-
-  // Find the Z of the active cogs
-  const activeFrontIdx = chainSorted.indexOf(activeFront);
-  const activeRearIdx = cassetteSorted.indexOf(activeRear);
+  const activeFrontIdx = allFront.indexOf(activeFront);
+  const activeRearIdx = allRear.indexOf(activeRear);
   const activeFrontZ = chainStartZ + activeFrontIdx * CHAINRING_GAP;
   const activeRearZ = cassetteStartZ + activeRearIdx * COG_SPACING;
-  const chainZ = (activeFrontZ + activeRearZ) / 2;
 
   const chain = createChainMesh(
     { x: FRONT_X, z: activeFrontZ },
@@ -2010,23 +2058,24 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
   );
   drivetrain.add(chain);
 
-  // ── Ground plane (subtle reflection) ──
-  const groundGeo = new THREE.PlaneGeometry(30, 30);
+  // ── Ground plane ──
+  const groundGeo = new THREE.PlaneGeometry(40, 40);
   const groundMat = new THREE.MeshStandardMaterial({
-    color: 0x111111,
-    metalness: 0.3,
-    roughness: 0.8,
+    color: 0x0a0a0a, metalness: 0.4, roughness: 0.85
   });
   const ground = new THREE.Mesh(groundGeo, groundMat);
   ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -6;
+  ground.position.y = -7;
   ground.receiveShadow = true;
   scene.add(ground);
 
   // ── Section labels ──
-  drivetrain.add(createLabel('CHAINRING', new THREE.Vector3(FRONT_X, -5.5, 0), '#555555', 2.5));
-  drivetrain.add(createLabel('CASSETTE', new THREE.Vector3(REAR_X, -5.5, 0), '#555555', 2.5));
+  drivetrain.add(createLabel('CHAINRING', new THREE.Vector3(FRONT_X, -6, 0), '#444444', 2.2));
+  drivetrain.add(createLabel('CASSETTE', new THREE.Vector3(REAR_X, -6, 0), '#444444', 2.2));
 
+  // Add groups to drivetrain
+  drivetrain.add(frontRotGroup);
+  drivetrain.add(rearRotGroup);
   scene.add(drivetrain);
 
   // ── Interaction hint ──
@@ -2034,19 +2083,34 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
   hint.className = 'gear-3d-hint';
   hint.textContent = 'Drag to rotate · Scroll to zoom';
   container.appendChild(hint);
-  setTimeout(() => hint.style.opacity = '0', 3000);
+  setTimeout(() => hint.style.opacity = '0', 3500);
 
-  // ── Slow auto-rotation ──
+  // ── Pedalling speed ──
+  const PEDAL_RPM = 80;   // cadence
+  const PEDAL_RAD_S = (PEDAL_RPM / 60) * Math.PI * 2;
+  const gearRatio = activeFront / activeRear;
+
+  // ── Animation ──
   let userInteracted = false;
   controls.addEventListener('start', () => { userInteracted = true; });
 
-  // ── Animation loop ──
+  const clock = new THREE.Clock();
   let animId;
+
   function animate() {
     animId = requestAnimationFrame(animate);
+    const dt = clock.getDelta();
 
+    // Rotate cogs — front rotates at pedal cadence, rear rotates faster by gear ratio
+    // Rotation is around the Z axis of each group (which is the axle direction after rotation.x = PI/2 in gear mesh)
+    // But our groups are positioned in world space, gears face XY plane after rotation.x
+    // The gear mesh has rotation.x = PI/2 so the "flat face" is XY. We rotate around Y for spinning.
+    frontRotGroup.rotation.z += PEDAL_RAD_S * dt;
+    rearRotGroup.rotation.z += PEDAL_RAD_S * gearRatio * dt;
+
+    // Gentle scene rotation until user interacts
     if (!userInteracted) {
-      drivetrain.rotation.y += 0.003;
+      drivetrain.rotation.y += 0.002;
     }
 
     controls.update();
@@ -2054,7 +2118,7 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
   }
   animate();
 
-  // ── Resize handling ──
+  // ── Resize ──
   const observer = new ResizeObserver(() => {
     const w = container.clientWidth;
     const h = container.clientHeight;
@@ -2064,7 +2128,6 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
   });
   observer.observe(container);
 
-  // Save for cleanup
   _gearScene = { renderer, controls, animId, observer };
 }
 
