@@ -220,6 +220,51 @@ A typical cycling FIT file contains:
 
 ---
 
+## Uninstalling — Revoking Strava Access
+
+If you no longer want to use Di2va, you should revoke its access to your Strava account and clean up the local files. Here's how:
+
+### 1. Revoke access in Strava
+
+This is the most important step — it immediately stops Di2va (or anyone with your credentials) from accessing your Strava data.
+
+1. Log in to **[Strava](https://www.strava.com)** in your browser
+2. Go to **[Settings → My Apps](https://www.strava.com/settings/apps)** (or click your profile picture → Settings → My Apps)
+3. Find **Di2va** (or whatever you named the application) in the list of connected apps
+4. Click **Revoke Access**
+
+This immediately invalidates all OAuth tokens. Di2va will no longer be able to read your activities.
+
+### 2. Delete the Strava API application (optional)
+
+If you also want to remove the API application itself:
+
+1. Go to **[https://www.strava.com/settings/api](https://www.strava.com/settings/api)**
+2. Delete the application
+
+This removes the Client ID and Client Secret entirely. You'd need to create a new one if you ever wanted to use Di2va again.
+
+### 3. Clean up local files
+
+On your machine, remove the credentials and any cached data:
+
+```bash
+# Delete the credentials file
+rm .env.local
+
+# (Optional) Delete the entire Di2va folder
+cd ..
+rm -rf Di2va
+```
+
+The `.env.local` file contains your Strava Client ID, Client Secret, and session secret. Deleting it ensures no credentials remain on disk.
+
+### What about my Strava data?
+
+Di2va doesn't store any of your Strava data persistently. Activity data, GPS tracks, and gear information exist only in your browser session while you're using the app. Once you close the browser tab (or the server stops), that data is gone. There is no database, no cache file, and no cloud storage to clean up.
+
+---
+
 ## Data Flow Diagram
 
 ```
