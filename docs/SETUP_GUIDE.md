@@ -142,9 +142,9 @@ Click a ride to load it. If the ride has a FIT file with Di2 data, the gear info
 - **Elevation profile** — hover to see gear, speed, cadence, and gradient at any point
 - **Gear statistics** — percentage of time in each gear, click any gear to see the interactive drivetrain visualization
 
-> ![Screenshot: Di2va showing a ride with gear data](screenshots/07-di2va-ride.png)
+> ![Di2va ride overview](screenshots/di2va-ride-overview.png)
 >
-> *A ride loaded with Di2 gear data. The map and elevation profile are colored by gear. Hover over the chart to see details.*
+> *A ride loaded with Di2 gear data. The map shows your route colored by gear combination, the elevation profile shows gear shifts and gradient, the hover panel shows live data at any point, and the gear usage summary breaks down time in each gear.*
 
 If no FIT file is available, Di2va estimates gears from cadence and speed data.
 
