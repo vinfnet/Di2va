@@ -617,6 +617,105 @@ function getGearColor(gearData) {
   return GEAR_COLORS[GEAR_COLORS.length - 1 - colorIdx];
 }
 
+// ─── Chart Magnify Plugin ───────────────────────────────────────────────────
+
+const magnifyPlugin = {
+  id: 'magnify',
+  _mouse: { x: -1000, y: -1000, active: false },
+  _drawing: false,
+  RADIUS: 80,
+  ZOOM: 2.5,
+
+  afterEvent(chart, args) {
+    const event = args.event;
+    const area = chart.chartArea;
+    if (!area) return;
+
+    if (event.type === 'mousemove') {
+      const x = event.x;
+      const y = event.y;
+      if (x >= area.left && x <= area.right && y >= area.top && y <= area.bottom) {
+        this._mouse = { x, y, active: true };
+      } else {
+        this._mouse.active = false;
+      }
+    } else if (event.type === 'mouseout') {
+      this._mouse.active = false;
+    }
+    // Chart redraws naturally via interaction/tooltip — no manual draw() needed
+  },
+
+  afterDraw(chart) {
+    if (!this._mouse.active || this._drawing) return;
+    this._drawing = true;
+
+    const { x, y } = this._mouse;
+    const R = this.RADIUS;
+    const zoom = this.ZOOM;
+    const canvas = chart.canvas;
+    const ctx = chart.ctx;
+    const dpr = window.devicePixelRatio || 1;
+
+    // Capture the current chart render as a snapshot before we draw on top
+    // (the chart has already finished drawing at this point in afterDraw)
+
+    ctx.save();
+
+    // --- Clip to circle at cursor ---
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, Math.PI * 2);
+    ctx.clip();
+
+    // --- Fill background inside lens (dark) ---
+    ctx.fillStyle = '#0f1117';
+    ctx.fillRect(x - R, y - R, R * 2, R * 2);
+
+    // --- Draw zoomed portion of the chart canvas ---
+    const srcSize = (R * 2) / zoom;
+    const sx = x - srcSize / 2;
+    const sy = y - srcSize / 2;
+
+    ctx.drawImage(
+      canvas,
+      sx * dpr, sy * dpr,
+      srcSize * dpr, srcSize * dpr,
+      x - R, y - R,
+      R * 2, R * 2
+    );
+
+    ctx.restore();
+
+    // --- Draw lens border ring ---
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Inner shadow ring
+    ctx.beginPath();
+    ctx.arc(x, y, R - 1, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Crosshair at centre
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x - 10, y);
+    ctx.lineTo(x + 10, y);
+    ctx.moveTo(x, y - 10);
+    ctx.lineTo(x, y + 10);
+    ctx.stroke();
+
+    ctx.restore();
+    this._drawing = false;
+  }
+};
+
 // ─── Elevation Chart ────────────────────────────────────────────────────────
 
 function renderElevationChart() {
@@ -757,6 +856,7 @@ function updateElevationChart() {
   state.chart = new Chart(ctx, {
     type: 'line',
     data: { labels: distances, datasets },
+    plugins: [magnifyPlugin],
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -764,6 +864,7 @@ function updateElevationChart() {
         mode: 'index',
         intersect: false
       },
+      events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
       plugins: {
         legend: { display: false },
         tooltip: {
