@@ -609,6 +609,25 @@ a:hover { color: var(--accent-hover); }
   margin-left: auto;
 }
 
+.shift-key {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.shift-key .shift-up {
+  color: #ef4444;
+  font-size: 0.85rem;
+}
+
+.shift-key .shift-down {
+  color: #3b82f6;
+  font-size: 0.85rem;
+  margin-left: 6px;
+}
+
 .toggle-label {
   display: flex;
   align-items: center;
