@@ -1775,15 +1775,14 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
 
   // ── Scene ──
   const scene = new THREE.Scene();
-  const isDarkMode = window.matchMedia?.('(prefers-color-scheme: dark)').matches !== false;
-  const bgColor = isDarkMode ? 0x1a1a2e : 0xe8e8f0;
+  const bgColor = 0x333333;
   scene.background = new THREE.Color(bgColor);
-  scene.fog = new THREE.FogExp2(bgColor, 0.012);
+  scene.fog = new THREE.FogExp2(bgColor, 0.008);
 
-  // ── Camera — 3/4 drive-side view, pulled back ──
+  // ── Camera — drive-side 3/4 view matching screenshot angle ──
   const camera = new THREE.PerspectiveCamera(32, W / H, 0.1, 200);
-  camera.position.set(-2, 4, 22);   // slightly left + above, pulled back
-  camera.lookAt(0, -0.5, 0);
+  camera.position.set(-3, 3.5, 18);   // slightly left, slightly above
+  camera.lookAt(-1, -0.5, 0);
 
   // ── Renderer ──
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -1802,11 +1801,11 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
   controls.dampingFactor = 0.08;
   controls.minDistance = 6;
   controls.maxDistance = 45;
-  controls.target.set(0, -0.5, 0);
+  controls.target.set(-1, -0.5, 0);
   controls.maxPolarAngle = Math.PI * 0.88;
 
-  // ── Lighting — brighter for lighter background ──
-  scene.add(new THREE.AmbientLight(isDarkMode ? 0x505060 : 0x808090, 0.7));
+  // ── Lighting — tuned for mid-grey background ──
+  scene.add(new THREE.AmbientLight(0x606060, 0.8));
 
   const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
   keyLight.position.set(6, 14, 12);
@@ -2062,7 +2061,7 @@ function renderDrivetrain3D(container, chainrings, cassette, activeFront, active
   // ── Ground plane ──
   const groundGeo = new THREE.PlaneGeometry(40, 40);
   const groundMat = new THREE.MeshStandardMaterial({
-    color: isDarkMode ? 0x141428 : 0xd0d0d8, metalness: 0.3, roughness: 0.85
+    color: 0x2a2a2a, metalness: 0.3, roughness: 0.85
   });
   const ground = new THREE.Mesh(groundGeo, groundMat);
   ground.rotation.x = -Math.PI / 2;
