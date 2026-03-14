@@ -237,6 +237,20 @@
   </main>
 
   <!-- Settings Modal -->
+  <!-- Gear Visualization Popup -->
+  <div id="gear-popup" class="modal-overlay hidden">
+    <div class="modal-card gear-popup-card">
+      <div class="modal-header">
+        <h3 id="gear-popup-title">Gear Visualization</h3>
+        <button id="btn-close-gear-popup" class="btn btn-sm btn-outline">✕</button>
+      </div>
+      <div class="modal-body gear-popup-body">
+        <canvas id="gear-popup-canvas"></canvas>
+        <div id="gear-popup-info" class="gear-popup-info"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="settings-modal" class="modal-overlay hidden">
     <div class="modal-card">
       <div class="modal-header">

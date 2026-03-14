@@ -839,3 +839,53 @@ a:hover { color: var(--accent-hover); }
   font-size: 0.82rem;
   color: var(--text-muted);
 }
+
+/* ─── Gear Visualization Popup ────────────────────────────────── */
+
+.gear-popup-card {
+  max-width: 680px;
+  width: 95%;
+}
+
+.gear-popup-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 20px 20px;
+}
+
+#gear-popup-canvas {
+  border-radius: var(--radius);
+  background: #0d0d0d;
+  display: block;
+}
+
+.gear-popup-info {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-top: 14px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.gear-popup-info .gpi-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gear-popup-info .gpi-value {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.gear-stat-card {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gear-stat-card:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+}

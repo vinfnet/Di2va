@@ -198,6 +198,12 @@ async function init() {
   });
   els.btnSaveFitFolder?.addEventListener('click', saveFitFolderSetting);
 
+  // Gear visualization popup
+  document.getElementById('btn-close-gear-popup')?.addEventListener('click', closeGearPopup);
+  document.getElementById('gear-popup')?.addEventListener('click', (e) => {
+    if (e.target.id === 'gear-popup') closeGearPopup();
+  });
+
   // Units switcher
   els.unitsSelect.addEventListener('change', () => {
     localStorage.setItem('di2va-units', els.unitsSelect.value);
@@ -1148,7 +1154,7 @@ function renderGearStats() {
 
   els.gearStatsContainer.classList.remove('hidden');
   els.gearStats.innerHTML = sorted.map(g => `
-    <div class="gear-stat-card">
+    <div class="gear-stat-card" data-front="${g.front}" data-rear="${g.rear}" data-color="${g.color}">
       <div class="gear-stat-color" style="background: ${g.color}"></div>
       <div class="gear-stat-info">
         <h4>${g.key}</h4>
@@ -1159,6 +1165,16 @@ function renderGearStats() {
       </div>
     </div>
   `).join('');
+
+  // Attach click handlers to each gear card
+  els.gearStats.querySelectorAll('.gear-stat-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const front = Number(card.dataset.front);
+      const rear  = Number(card.dataset.rear);
+      const color = card.dataset.color;
+      showGearPopup(front, rear, color);
+    });
+  });
 }
 
 // ─── Auto-Match Di2 Data from FIT Library ───────────────────────────────────
@@ -1588,6 +1604,284 @@ function mergeFitDataWithStreams(fitData) {
   });
   console.log(`[Di2va] Merged gear distribution (${gears.length} points, ${combos.size} combos):`,
     [...combos.entries()].sort((a,b) => b[1]-a[1]).slice(0, 5).map(([k,v]) => `${k}:${v}`).join(', '));
+}
+
+// ─── 3D Gear Visualization ──────────────────────────────────────────────────
+
+/**
+ * Draw a single gear cog (viewed at an oblique tilt).
+ * Returns nothing — draws directly on ctx.
+ */
+function drawCog(ctx, cx, cy, teeth, radius, tilt, opts = {}) {
+  const {
+    fill = '#3a3a3a',
+    stroke = '#555',
+    toothDepth = Math.max(3, radius * 0.08),
+    lineWidth = 1,
+    glow = null,       // colour string for shadow glow
+    label = null,      // text inside the cog
+    labelColor = '#999'
+  } = opts;
+
+  const steps = teeth * 2;
+
+  // ── cog outline (teeth) ──
+  ctx.save();
+  if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 18; }
+  ctx.beginPath();
+  for (let i = 0; i <= steps; i++) {
+    const angle = (i / steps) * Math.PI * 2;
+    const r = (i % 2 === 0) ? radius + toothDepth : radius - toothDepth;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle) * tilt;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+  ctx.restore();
+
+  // ── hub hole ──
+  const hub = Math.max(4, radius * 0.15);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, hub, hub * tilt, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#111';
+  ctx.fill();
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+
+  // ── label ──
+  if (label) {
+    ctx.fillStyle = labelColor;
+    ctx.font = `bold ${Math.max(9, radius * 0.32)}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, cx, cy);
+  }
+}
+
+/**
+ * Draw the chain path between two cog centres / radii.
+ */
+function drawChain(ctx, x1, y1, r1, x2, y2, r2, tilt, color) {
+  const alpha = 0.45;
+
+  // top tangent line
+  ctx.beginPath();
+  ctx.moveTo(x1, y1 - r1 * tilt);
+  ctx.lineTo(x2, y2 - r2 * tilt);
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // bottom tangent line
+  ctx.beginPath();
+  ctx.moveTo(x1, y1 + r1 * tilt);
+  ctx.lineTo(x2, y2 + r2 * tilt);
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // chain arcs around each cog
+  // front cog — bottom half arc
+  ctx.beginPath();
+  ctx.ellipse(x1, y1, r1, r1 * tilt, 0, Math.PI * 0.5, Math.PI * 1.5, true);
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = alpha * 0.7;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // rear cog — top half arc
+  ctx.beginPath();
+  ctx.ellipse(x2, y2, r2, r2 * tilt, 0, -Math.PI * 0.5, Math.PI * 0.5, true);
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = alpha * 0.7;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+/**
+ * Main drivetrain renderer.
+ * @param {HTMLCanvasElement} canvas
+ * @param {number[]} chainrings – e.g. [34, 50]
+ * @param {number[]} cassette   – e.g. [11,12,13,...,32]
+ * @param {number}   activeFront – active chainring teeth
+ * @param {number}   activeRear  – active cassette cog teeth
+ * @param {string}   activeColor – hex colour for the active combo
+ */
+function drawDrivetrain(canvas, chainrings, cassette, activeFront, activeRear, activeColor) {
+  const DPR = window.devicePixelRatio || 1;
+  const W = 640, H = 380;
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
+  ctx.clearRect(0, 0, W, H);
+
+  const TILT = 0.62;                // vertical compression for perspective
+  const TOOTH_PX = 2.0;             // pixels per tooth for radius
+  const maxFront = Math.max(...chainrings);
+  const maxRear  = Math.max(...cassette);
+
+  // ── centres ──
+  const frontCX = 170, frontCY = H / 2 + 10;
+  const rearCX  = 475, rearCY  = H / 2 + 10;
+
+  // ── depth offsets for cassette stack ──
+  const cassetteCount = cassette.length;
+  const DEPTH_DX = 1.2;  // px offset per cog layer
+  const DEPTH_DY = 0.8;
+
+  // ── "Axle" line ──
+  ctx.setLineDash([4, 6]);
+  ctx.strokeStyle = '#2a2a2a';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(frontCX, frontCY);
+  ctx.lineTo(rearCX, rearCY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── Draw chain FIRST (behind cogs) ──
+  const frontRadius = activeFront * TOOTH_PX;
+  const rearRadius  = activeRear * TOOTH_PX;
+  drawChain(ctx, frontCX, frontCY, frontRadius, rearCX, rearCY, rearRadius, TILT, activeColor);
+
+  // ── Draw cassette (back to front: biggest cog first) ──
+  const cassetteSorted = [...cassette].sort((a, b) => b - a); // biggest first
+  cassetteSorted.forEach((teeth, layerIdx) => {
+    const isActive = teeth === activeRear;
+    const r = teeth * TOOTH_PX;
+    // Offset: biggest cog is deepest (furthest away)
+    const offsetX = rearCX - (cassetteCount - 1 - layerIdx) * DEPTH_DX;
+    const offsetY = rearCY - (cassetteCount - 1 - layerIdx) * DEPTH_DY;
+
+    // Inactive = dark metallic; active = highlighted
+    const fill   = isActive ? activeColor + '55' : `rgba(50,50,50,${0.5 + layerIdx * 0.04})`;
+    const strokeC = isActive ? activeColor : '#555';
+
+    drawCog(ctx, offsetX, offsetY, teeth, r, TILT, {
+      fill,
+      stroke: strokeC,
+      lineWidth: isActive ? 2 : 0.8,
+      glow: isActive ? activeColor : null,
+      label: String(teeth) + 'T',
+      labelColor: isActive ? '#fff' : '#888',
+      toothDepth: Math.max(2, r * 0.09)
+    });
+  });
+
+  // ── Draw chainrings (biggest behind) ──
+  const chainSorted = [...chainrings].sort((a, b) => b - a);
+  chainSorted.forEach((teeth, layerIdx) => {
+    const isActive = teeth === activeFront;
+    const r = teeth * TOOTH_PX;
+    const offsetX = frontCX + layerIdx * DEPTH_DX * 2;
+    const offsetY = frontCY - layerIdx * DEPTH_DY * 2;
+
+    const fill   = isActive ? activeColor + '55' : `rgba(50,50,50,${0.55 + layerIdx * 0.1})`;
+    const strokeC = isActive ? activeColor : '#555';
+
+    drawCog(ctx, offsetX, offsetY, teeth, r, TILT, {
+      fill,
+      stroke: strokeC,
+      lineWidth: isActive ? 2 : 0.8,
+      glow: isActive ? activeColor : null,
+      label: String(teeth) + 'T',
+      labelColor: isActive ? '#fff' : '#888',
+      toothDepth: Math.max(3, r * 0.07)
+    });
+  });
+
+  // ── Crank arm ──
+  const crankLen = maxFront * TOOTH_PX + 30;
+  ctx.save();
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(frontCX, frontCY);
+  ctx.lineTo(frontCX - 20, frontCY + crankLen * TILT * 0.6);
+  ctx.stroke();
+  // pedal circle
+  ctx.beginPath();
+  ctx.arc(frontCX - 20, frontCY + crankLen * TILT * 0.6, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#555';
+  ctx.fill();
+  ctx.restore();
+
+  // ── Labels ──
+  ctx.fillStyle = '#666';
+  ctx.font = '12px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Chainring' + (chainrings.length > 1 ? 's' : ''), frontCX, 28);
+  ctx.fillText('Cassette', rearCX, 28);
+
+  // Active gear callout
+  const ratio = (activeFront / activeRear).toFixed(2);
+  ctx.fillStyle = activeColor;
+  ctx.font = 'bold 16px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${activeFront}/${activeRear}`, W / 2, H - 22);
+  ctx.fillStyle = '#888';
+  ctx.font = '12px system-ui, sans-serif';
+  ctx.fillText(`Ratio ${ratio}`, W / 2, H - 6);
+}
+
+/**
+ * Open the gear visualization popup for a given front/rear combo.
+ */
+function showGearPopup(front, rear, color) {
+  if (!state.gearData) return;
+
+  // Collect actual chainring & cassette sizes from ride data
+  const frontSet = new Set(), rearSet = new Set();
+  state.gearData.forEach(g => {
+    if (g?.front) frontSet.add(g.front);
+    if (g?.rear) rearSet.add(g.rear);
+  });
+  const chainrings = [...frontSet].sort((a, b) => a - b);
+  const cassette   = [...rearSet].sort((a, b) => a - b);
+
+  // Update title
+  document.getElementById('gear-popup-title').textContent =
+    `Gear: ${front}/${rear}`;
+
+  // Info bar
+  const ratio = (front / rear).toFixed(2);
+  const metres = front / rear * 2.1 * Math.PI;  // dev. in metres (700c wheel ~2.1m circ.)
+  const info = document.getElementById('gear-popup-info');
+  info.innerHTML = `
+    <span class="gpi-item">Ratio: <span class="gpi-value">${ratio}</span></span>
+    <span class="gpi-item">Development: <span class="gpi-value">${metres.toFixed(1)} m</span></span>
+    <span class="gpi-item">Front: <span class="gpi-value">${front}T</span></span>
+    <span class="gpi-item">Rear: <span class="gpi-value">${rear}T</span></span>
+  `;
+
+  // Draw
+  const canvas = document.getElementById('gear-popup-canvas');
+  drawDrivetrain(canvas, chainrings, cassette, front, rear, color);
+
+  // Show
+  document.getElementById('gear-popup').classList.remove('hidden');
+}
+
+function closeGearPopup() {
+  document.getElementById('gear-popup').classList.add('hidden');
 }
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
