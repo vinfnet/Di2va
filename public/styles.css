@@ -889,6 +889,57 @@ a:hover { color: var(--accent-hover); }
   color: var(--text);
 }
 
+.gear-popup-nav {
+  display: flex;
+  gap: 6px;
+  padding: 10px 0 4px;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+
+.gear-popup-nav::-webkit-scrollbar {
+  height: 4px;
+}
+
+.gear-popup-nav::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px;
+}
+
+.gear-nav-chip {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border: 1.5px solid;
+  border-radius: 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: system-ui, -apple-system, sans-serif;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.gear-nav-chip:hover {
+  opacity: 0.85;
+  transform: scale(1.05);
+}
+
+.gear-nav-chip.active {
+  box-shadow: 0 0 8px rgba(255,255,255,0.2);
+  transform: scale(1.08);
+}
+
+.gear-popup-hint {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.5;
+  margin-top: 6px;
+  text-align: center;
+}
+
 .gear-stat-card {
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;

@@ -1821,13 +1821,114 @@ function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activ
   container.innerHTML = svg;
 }
 
+// ─── Gear Popup Navigation State ────────────────────────────────────────────
+let _gearNav = null;  // { gears: [{front,rear,color,ratio}], index, chainrings, cassette, keyHandler }
+
+/**
+ * Build sorted gear list from ride data (easiest → hardest by ratio).
+ */
+function _buildGearList() {
+  if (!state.gearData) return [];
+  const counts = new Map();
+  state.gearData.forEach(g => {
+    if (g?.front && g?.rear) {
+      const key = `${g.front}/${g.rear}`;
+      if (!counts.has(key)) counts.set(key, { front: g.front, rear: g.rear });
+    }
+  });
+  return Array.from(counts.values())
+    .map(g => ({
+      front: g.front,
+      rear: g.rear,
+      ratio: g.front / g.rear,
+      color: getGearColor(g)
+    }))
+    .sort((a, b) => a.ratio - b.ratio);  // easiest (lowest ratio) first
+}
+
+/**
+ * Update the popup to show gear at the given index in _gearNav.gears.
+ */
+function _updateGearPopup(index) {
+  if (!_gearNav) return;
+  _gearNav.index = index;
+  const g = _gearNav.gears[index];
+
+  // Title
+  document.getElementById('gear-popup-title').textContent =
+    `Gear: ${g.front}/${g.rear}`;
+
+  // Info bar
+  const ratio = g.ratio.toFixed(2);
+  const metres = g.ratio * 2.1 * Math.PI;
+  const info = document.getElementById('gear-popup-info');
+  info.innerHTML = `
+    <span class="gpi-item">Ratio: <span class="gpi-value">${ratio}</span></span>
+    <span class="gpi-item">Development: <span class="gpi-value">${metres.toFixed(1)} m</span></span>
+    <span class="gpi-item">Front: <span class="gpi-value">${g.front}T</span></span>
+    <span class="gpi-item">Rear: <span class="gpi-value">${g.rear}T</span></span>
+  `;
+
+  // SVG
+  const container = document.getElementById('gear-popup-3d');
+  renderDrivetrainSVG(container, _gearNav.chainrings, _gearNav.cassette, g.front, g.rear, g.color);
+
+  // Nav bar
+  _renderGearNavBar();
+}
+
+/**
+ * Render the gear navigation bar — clickable chips for every gear in the ride.
+ */
+function _renderGearNavBar() {
+  const nav = document.getElementById('gear-popup-nav');
+  if (!nav || !_gearNav) return;
+
+  nav.innerHTML = _gearNav.gears.map((g, i) => {
+    const active = i === _gearNav.index;
+    const cls = active ? 'gear-nav-chip active' : 'gear-nav-chip';
+    const bg = active ? g.color : 'transparent';
+    const border = g.color;
+    const textColor = active ? '#fff' : g.color;
+    return `<button class="${cls}" data-idx="${i}" ` +
+      `style="background:${bg};border-color:${border};color:${textColor}" ` +
+      `title="${g.front}/${g.rear} — ratio ${g.ratio.toFixed(2)}"` +
+      `>${g.front}/${g.rear}</button>`;
+  }).join('');
+
+  // Arrow indicators
+  const atStart = _gearNav.index === 0;
+  const atEnd = _gearNav.index === _gearNav.gears.length - 1;
+  const hint = nav.closest('.gear-popup-body')?.querySelector('.gear-popup-hint');
+  if (hint) {
+    if (atStart) hint.textContent = '→ harder gear';
+    else if (atEnd) hint.textContent = '← easier gear';
+    else hint.textContent = '← easier · harder →';
+  }
+
+  // Click handlers on chips
+  nav.querySelectorAll('.gear-nav-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _updateGearPopup(Number(btn.dataset.idx));
+    });
+  });
+
+  // Scroll active chip into view
+  const activeChip = nav.querySelector('.gear-nav-chip.active');
+  if (activeChip) activeChip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+}
+
 /**
  * Open the gear visualization popup for a given front/rear combo.
  */
 function showGearPopup(front, rear, color) {
   if (!state.gearData) return;
 
-  // Collect actual chainring & cassette sizes from ride data
+  // Build sorted gear list
+  const gears = _buildGearList();
+  if (gears.length === 0) return;
+
+  // Collect chainring & cassette arrays for SVG
   const frontSet = new Set(), rearSet = new Set();
   state.gearData.forEach(g => {
     if (g?.front) frontSet.add(g.front);
@@ -1836,32 +1937,47 @@ function showGearPopup(front, rear, color) {
   const chainrings = [...frontSet].sort((a, b) => a - b);
   const cassette   = [...rearSet].sort((a, b) => a - b);
 
-  // Update title
-  document.getElementById('gear-popup-title').textContent =
-    `Gear: ${front}/${rear}`;
+  // Find index of the clicked gear
+  let startIdx = gears.findIndex(g => g.front === front && g.rear === rear);
+  if (startIdx === -1) startIdx = 0;
 
-  // Info bar
-  const ratio = (front / rear).toFixed(2);
-  const metres = front / rear * 2.1 * Math.PI;
-  const info = document.getElementById('gear-popup-info');
-  info.innerHTML = `
-    <span class="gpi-item">Ratio: <span class="gpi-value">${ratio}</span></span>
-    <span class="gpi-item">Development: <span class="gpi-value">${metres.toFixed(1)} m</span></span>
-    <span class="gpi-item">Front: <span class="gpi-value">${front}T</span></span>
-    <span class="gpi-item">Rear: <span class="gpi-value">${rear}T</span></span>
-  `;
+  // Arrow key handler
+  const keyHandler = (e) => {
+    if (!_gearNav) return;
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      if (_gearNav.index < _gearNav.gears.length - 1) {
+        _updateGearPopup(_gearNav.index + 1);
+      }
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      if (_gearNav.index > 0) {
+        _updateGearPopup(_gearNav.index - 1);
+      }
+    } else if (e.key === 'Escape') {
+      closeGearPopup();
+    }
+  };
 
-  // Show popup first so container has dimensions
+  _gearNav = { gears, index: startIdx, chainrings, cassette, keyHandler };
+
+  // Show popup
   document.getElementById('gear-popup').classList.remove('hidden');
+  document.addEventListener('keydown', keyHandler);
 
-  // Render SVG
-  const container = document.getElementById('gear-popup-3d');
-  renderDrivetrainSVG(container, chainrings, cassette, front, rear, color);
+  // Initial render
+  _updateGearPopup(startIdx);
 }
 
 function closeGearPopup() {
+  if (_gearNav?.keyHandler) {
+    document.removeEventListener('keydown', _gearNav.keyHandler);
+  }
+  _gearNav = null;
   const container = document.getElementById('gear-popup-3d');
   if (container) container.innerHTML = '';
+  const nav = document.getElementById('gear-popup-nav');
+  if (nav) nav.innerHTML = '';
   document.getElementById('gear-popup').classList.add('hidden');
 }
 
