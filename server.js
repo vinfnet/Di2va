@@ -24,7 +24,13 @@ const upload = multer({ dest: uploadDir });
 // Middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  lastModified: true,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  }
+}));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'di2va-secret',
   resave: false,
@@ -78,8 +84,8 @@ app.post('/setup', express.urlencoded({ extended: false }), (req, res) => {
 // Redirect everything to /setup when not configured (except static assets)
 app.use((req, res, next) => {
   if (isStravaConfigured()) return next();
-  // Allow setup routes and static assets through
-  if (req.path === '/setup' || req.path.match(/\.(css|js|ico|png|jpg|svg|woff2?)$/)) {
+  // Allow setup routes, auth routes, and static assets through
+  if (req.path === '/setup' || req.path.startsWith('/auth/') || req.path.match(/\.(css|js|ico|png|jpg|svg|woff2?)$/)) {
     return next();
   }
   res.redirect('/setup');
