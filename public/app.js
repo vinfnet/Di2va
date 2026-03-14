@@ -99,7 +99,8 @@ const els = {
   fitFolderInput:  $('fit-folder-input'),
   btnSaveFitFolder: $('btn-save-fit-folder'),
   fitLibraryStatus: $('fit-library-status'),
-  fitLibraryBanner: $('fit-library-banner')
+  fitLibraryBanner: $('fit-library-banner'),
+  unitsSelect:     $('units-select')
 };
 
 // ─── API Helpers ────────────────────────────────────────────────────────────
@@ -117,6 +118,9 @@ async function api(url, options = {}) {
 // ─── Init ───────────────────────────────────────────────────────────────────
 
 async function init() {
+  // Restore units preference
+  els.unitsSelect.value = getUnits();
+
   try {
     const athlete = await api('/api/me');
     state.authenticated = true;
@@ -161,6 +165,15 @@ async function init() {
     if (e.target === els.settingsModal) els.settingsModal.classList.add('hidden');
   });
   els.btnSaveFitFolder?.addEventListener('click', saveFitFolderSetting);
+
+  // Units switcher
+  els.unitsSelect.addEventListener('change', () => {
+    localStorage.setItem('di2va-units', els.unitsSelect.value);
+    // Re-render everything that shows units
+    if (state.activities.length) renderActivities();
+    if (state.currentActivity) renderActivityStats(state.currentActivity);
+    if (state.chart) updateElevationChart();
+  });
 
   // Global drag-and-drop for .FIT files
   setupDragAndDrop();
@@ -222,8 +235,8 @@ function renderActivities() {
     card.addEventListener('click', () => openActivity(activity));
 
     const date = new Date(activity.start_date_local);
-    const distance = (activity.distance / 1000).toFixed(1);
-    const elevation = Math.round(activity.total_elevation_gain);
+    const distance = distFromMetres(activity.distance).toFixed(1);
+    const elevation = Math.round(elevFromMetres(activity.total_elevation_gain));
     const duration = formatDuration(activity.moving_time);
     const hasGearIndicator = activity.device_name?.toLowerCase().includes('di2') ||
                              activity.gear_id ? '⚙️ ' : '';
@@ -237,11 +250,11 @@ function renderActivities() {
       </div>
       <div class="activity-card-stats">
         <div class="activity-stat">
-          <div class="value">${distance}<small> km</small></div>
+          <div class="value">${distance}<small> ${distUnit()}</small></div>
           <div class="label">Distance</div>
         </div>
         <div class="activity-stat">
-          <div class="value">${elevation}<small> m</small></div>
+          <div class="value">${elevation}<small> ${elevUnit()}</small></div>
           <div class="label">Elevation</div>
         </div>
         <div class="activity-stat">
@@ -315,11 +328,11 @@ async function openActivity(activity) {
 }
 
 function renderActivityStats(activity) {
-  const distance = (activity.distance / 1000).toFixed(1);
-  const elevation = Math.round(activity.total_elevation_gain);
+  const distance = distFromMetres(activity.distance).toFixed(1);
+  const elevation = Math.round(elevFromMetres(activity.total_elevation_gain));
   const duration = formatDuration(activity.moving_time);
-  const avgSpeed = ((activity.average_speed || 0) * 3.6).toFixed(1);
-  const maxSpeed = ((activity.max_speed || 0) * 3.6).toFixed(1);
+  const avgSpeed = speedFromMs(activity.average_speed || 0).toFixed(1);
+  const maxSpeed = speedFromMs(activity.max_speed || 0).toFixed(1);
   const avgWatts = activity.average_watts ? `${Math.round(activity.average_watts)}` : '—';
   const avgCadence = activity.average_cadence ? `${Math.round(activity.average_cadence)}` : '—';
 
@@ -327,11 +340,11 @@ function renderActivityStats(activity) {
   const shiftCounts = countGearShifts();
 
   els.detailStats.innerHTML = `
-    <div class="stat"><span class="value">${distance} km</span><span class="label">Distance</span></div>
-    <div class="stat"><span class="value">${elevation} m</span><span class="label">Elevation</span></div>
+    <div class="stat"><span class="value">${distance} ${distUnit()}</span><span class="label">Distance</span></div>
+    <div class="stat"><span class="value">${elevation} ${elevUnit()}</span><span class="label">Elevation</span></div>
     <div class="stat"><span class="value">${duration}</span><span class="label">Moving Time</span></div>
-    <div class="stat"><span class="value">${avgSpeed} km/h</span><span class="label">Avg Speed</span></div>
-    <div class="stat"><span class="value">${maxSpeed} km/h</span><span class="label">Max Speed</span></div>
+    <div class="stat"><span class="value">${avgSpeed} ${speedUnit()}</span><span class="label">Avg Speed</span></div>
+    <div class="stat"><span class="value">${maxSpeed} ${speedUnit()}</span><span class="label">Max Speed</span></div>
     <div class="stat"><span class="value">${avgWatts} W</span><span class="label">Avg Power</span></div>
     <div class="stat"><span class="value">${avgCadence} rpm</span><span class="label">Avg Cadence</span></div>
     <div class="stat shift-stat"><span class="value">${shiftCounts.rear}</span><span class="label">Rear Shifts</span></div>
@@ -788,8 +801,8 @@ function updateElevationChart() {
   }
 
   const ctx = els.elevationChart.getContext('2d');
-  const distances = streams.distance.map(d => (d / 1000).toFixed(2)); // km
-  const elevations = streams.altitude;
+  const distances = streams.distance.map(d => distFromMetres(d).toFixed(2));
+  const elevations = streams.altitude.map(a => elevFromMetres(a));
 
   // Build colored segments for the elevation line
   const pointColors = [];
@@ -913,7 +926,7 @@ function updateElevationChart() {
       scales: {
         x: {
           display: true,
-          title: { display: true, text: 'Distance (km)', color: '#8b8fa3' },
+          title: { display: true, text: `Distance (${distUnit()})`, color: '#8b8fa3' },
           ticks: {
             color: '#8b8fa3',
             maxTicksLimit: 20,
@@ -927,7 +940,7 @@ function updateElevationChart() {
         },
         y: {
           display: true,
-          title: { display: true, text: 'Elevation (m)', color: '#8b8fa3' },
+          title: { display: true, text: `Elevation (${elevUnit()})`, color: '#8b8fa3' },
           ticks: { color: '#8b8fa3' },
           grid: { color: 'rgba(42,45,58,0.5)' }
         },
@@ -1017,13 +1030,13 @@ function highlightPoint(index) {
   }
 
   els.hoverElevation.textContent = streams.altitude?.[index]
-    ? `${streams.altitude[index].toFixed(0)} m` : '—';
+    ? `${elevFromMetres(streams.altitude[index]).toFixed(0)} ${elevUnit()}` : '—';
   els.hoverDistance.textContent = streams.distance?.[index]
-    ? `${(streams.distance[index] / 1000).toFixed(2)} km` : '—';
+    ? `${distFromMetres(streams.distance[index]).toFixed(2)} ${distUnit()}` : '—';
   els.hoverGradient.textContent = streams.grade_smooth?.[index] !== undefined
     ? `${streams.grade_smooth[index].toFixed(1)}%` : '—';
   els.hoverSpeed.textContent = streams.velocity_smooth?.[index]
-    ? `${(streams.velocity_smooth[index] * 3.6).toFixed(1)} km/h` : '—';
+    ? `${speedFromMs(streams.velocity_smooth[index]).toFixed(1)} ${speedUnit()}` : '—';
   els.hoverCadence.textContent = streams.cadence?.[index]
     ? `${streams.cadence[index]} rpm` : '—';
   els.hoverPower.textContent = streams.watts?.[index]

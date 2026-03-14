@@ -75,6 +75,38 @@ a:hover { color: var(--accent-hover); }
   gap: 12px;
 }
 
+.units-select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238b8fa3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  padding-right: 22px;
+}
+
+.units-select:hover {
+  border-color: var(--accent);
+}
+
+.units-select:focus {
+  border-color: var(--accent);
+}
+
+.units-select option {
+  background: var(--bg-card);
+  color: var(--text);
+}
+
 .avatar {
   width: 28px;
   height: 28px;
