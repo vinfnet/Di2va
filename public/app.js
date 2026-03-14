@@ -708,25 +708,25 @@ function updateElevationChart() {
   ];
 
   // Add gear shift markers as directional arrows on the elevation line
-  // Up arrows (▲) = upshift (harder gear / higher ratio)
-  // Down arrows (▼) = downshift (easier gear / lower ratio)
+  // Up arrows (▲) = upshift (harder gear / higher ratio)  — red
+  // Down arrows (▼) = downshift (easier gear / lower ratio) — blue
   if (shiftIndices.length > 0) {
     datasets.push({
       label: 'Gear Shifts',
       data: shiftData,
       borderColor: (ctx) => {
         const dir = shiftDirection[ctx.dataIndex];
-        return dir === 'up' ? '#ef4444' : dir === 'down' ? '#3b82f6' : 'transparent';
+        return dir === 'up' ? '#ffffff' : dir === 'down' ? '#ffffff' : 'transparent';
       },
       backgroundColor: (ctx) => {
         const dir = shiftDirection[ctx.dataIndex];
         return dir === 'up' ? '#ef4444' : dir === 'down' ? '#3b82f6' : 'transparent';
       },
-      borderWidth: 1,
-      pointRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? 6 : 0,
-      pointHoverRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? 8 : 0,
+      borderWidth: 2,
+      pointRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? 9 : 0,
+      pointHoverRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? 12 : 0,
       pointStyle: (ctx) => {
-        return shiftData[ctx.dataIndex] !== null ? 'triangle' : 'circle';
+        return shiftData[ctx.dataIndex] !== null ? 'triangle' : false;
       },
       rotation: (ctx) => {
         // 0 = triangle pointing up, 180 = pointing down
