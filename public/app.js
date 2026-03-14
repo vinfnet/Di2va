@@ -987,14 +987,18 @@ async function parseFitFile(file, standalone) {
 
     state.fitGearData = result;
 
+    console.log(`[Di2va] FIT parsed: ${result.records.length} records, ${result.gear_changes?.length || 0} gear changes, has_gear_data=${result.has_gear_data}`);
+
     if (result.has_gear_data) {
       state.usingFitData = true;
 
       if (standalone && result.records.length > 0) {
         // Use FIT file data directly (no Strava activity needed)
+        console.log('[Di2va] Using standalone FIT path (openFitActivity)');
         openFitActivity(result);
       } else if (!standalone && state.streams) {
         // Merge FIT gear data with Strava streams
+        console.log('[Di2va] Merging FIT gear data with Strava streams');
         mergeFitDataWithStreams(result);
         els.fitImportPanel.classList.add('hidden');
         updateDataSourceBadge();
@@ -1095,32 +1099,89 @@ function mergeFitDataWithStreams(fitData) {
 
   const fitRecords = fitData.records;
   const stravaLatlngs = state.streams.latlng;
+  const stravaTime = state.streams.time;        // elapsed seconds from Strava
+  const stravaDist = state.streams.distance;    // meters from Strava
   const gears = [];
 
-  // Match FIT records to Strava stream points by distance
-  // (timestamps may differ, distance is more reliable)
-  let fitIdx = 0;
+  // Strategy 1: Match by elapsed time (most reliable)
+  // Strava 'time' stream = elapsed seconds. FIT 'elapsed_time' = elapsed seconds.
+  const useTime = stravaTime && stravaTime.length === stravaLatlngs.length &&
+                  fitRecords.some(r => r.elapsed_time !== undefined && r.elapsed_time !== null);
 
-  for (let i = 0; i < stravaLatlngs.length; i++) {
-    const stravaDist = state.streams.distance?.[i] || 0;
+  // Strategy 2: Match by distance
+  // Strava distance is in meters. FIT distance (with lengthUnit:'km') is in km.
+  const useDist = !useTime && stravaDist && stravaDist.length === stravaLatlngs.length &&
+                  fitRecords.some(r => r.distance !== undefined && r.distance !== null);
 
-    // Find the closest FIT record by distance
-    while (fitIdx < fitRecords.length - 1 &&
-           Math.abs((fitRecords[fitIdx + 1].distance || 0) * 1000 - stravaDist) <
-           Math.abs((fitRecords[fitIdx].distance || 0) * 1000 - stravaDist)) {
-      fitIdx++;
+  if (useTime) {
+    console.log(`[Di2va] Merge strategy: elapsed time (stravaTime: ${stravaTime.length} pts, fitRecords: ${fitRecords.length})`);
+    // Two-pointer merge by elapsed time
+    let fitIdx = 0;
+    for (let i = 0; i < stravaLatlngs.length; i++) {
+      const t = stravaTime[i] || 0;
+
+      while (fitIdx < fitRecords.length - 1) {
+        const currDiff = Math.abs((fitRecords[fitIdx].elapsed_time || 0) - t);
+        const nextDiff = Math.abs((fitRecords[fitIdx + 1].elapsed_time || 0) - t);
+        if (nextDiff < currDiff) { fitIdx++; } else { break; }
+      }
+
+      const fitRec = fitRecords[fitIdx];
+      gears.push({
+        front: fitRec.front_gear_teeth || null,
+        rear: fitRec.rear_gear_teeth || null,
+        gear_ratio: fitRec.gear_ratio || null,
+        estimated: false
+      });
     }
+  } else if (useDist) {
+    console.log(`[Di2va] Merge strategy: distance (stravaDist: ${stravaDist.length} pts, fitRecords: ${fitRecords.length})`);
+    // Two-pointer merge by distance
+    let fitIdx = 0;
+    for (let i = 0; i < stravaLatlngs.length; i++) {
+      const d = stravaDist[i] || 0; // meters
 
-    const fitRec = fitRecords[fitIdx];
-    gears.push({
-      front: fitRec.front_gear_teeth || null,
-      rear: fitRec.rear_gear_teeth || null,
-      gear_ratio: fitRec.gear_ratio || null,
-      estimated: false
-    });
+      while (fitIdx < fitRecords.length - 1) {
+        const currDiff = Math.abs((fitRecords[fitIdx].distance || 0) * 1000 - d);
+        const nextDiff = Math.abs((fitRecords[fitIdx + 1].distance || 0) * 1000 - d);
+        if (nextDiff < currDiff) { fitIdx++; } else { break; }
+      }
+
+      const fitRec = fitRecords[fitIdx];
+      gears.push({
+        front: fitRec.front_gear_teeth || null,
+        rear: fitRec.rear_gear_teeth || null,
+        gear_ratio: fitRec.gear_ratio || null,
+        estimated: false
+      });
+    }
+  } else {
+    console.log('[Di2va] Merge strategy: proportional index (no time or distance)');
+    // Fallback: proportional index mapping (no time or distance available)
+    for (let i = 0; i < stravaLatlngs.length; i++) {
+      const fitIdx = Math.min(
+        Math.round((i / stravaLatlngs.length) * fitRecords.length),
+        fitRecords.length - 1
+      );
+      const fitRec = fitRecords[fitIdx];
+      gears.push({
+        front: fitRec.front_gear_teeth || null,
+        rear: fitRec.rear_gear_teeth || null,
+        gear_ratio: fitRec.gear_ratio || null,
+        estimated: false
+      });
+    }
   }
 
   state.gearData = gears;
+
+  // Log gear distribution for debugging
+  const combos = new Map();
+  gears.forEach(g => {
+    if (g?.front && g?.rear) combos.set(`${g.front}/${g.rear}`, (combos.get(`${g.front}/${g.rear}`) || 0) + 1);
+  });
+  console.log(`[Di2va] Merged gear distribution (${gears.length} points, ${combos.size} combos):`,
+    [...combos.entries()].sort((a,b) => b[1]-a[1]).slice(0, 5).map(([k,v]) => `${k}:${v}`).join(', '));
 }
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
