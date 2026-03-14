@@ -619,6 +619,16 @@ a:hover { color: var(--accent-hover); }
   padding: 3px 0;
 }
 
+.hover-info-title {
+  justify-content: center;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
 .hover-label { color: var(--text-muted); }
 .hover-value { font-weight: 600; }
 

@@ -78,6 +78,7 @@ const els = {
   gearStatsContainer: $('gear-stats-container'),
   gearStats:       $('gear-stats'),
   hoverInfo:       $('hover-info'),
+  hoverDistance:   $('hover-distance'),
   hoverGear:       $('hover-gear'),
   hoverElevation:  $('hover-elevation'),
   hoverGradient:   $('hover-gradient'),
@@ -907,41 +908,7 @@ function updateElevationChart() {
       events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
       plugins: {
         legend: { display: false },
-        tooltip: {
-          backgroundColor: '#1a1d27',
-          borderColor: '#2a2d3a',
-          borderWidth: 1,
-          titleColor: '#e4e4e7',
-          bodyColor: '#8b8fa3',
-          padding: 12,
-          callbacks: {
-            title: (items) => `${items[0].label} km`,
-            label: (item) => {
-              if (item.datasetIndex === 0) {
-                return `Elevation: ${item.raw.toFixed(0)} m`;
-              }
-              if (item.dataset.label === 'Gear Shifts') return null;
-              return `Gradient: ${item.raw.toFixed(1)}%`;
-            },
-            afterBody: (items) => {
-              const idx = items[0].dataIndex;
-              const parts = [];
-              if (gears && gears[idx]?.front && gears[idx]?.rear) {
-                parts.push(`Gear: ${gears[idx].front}/${gears[idx].rear}`);
-              }
-              if (streams.cadence && streams.cadence[idx]) {
-                parts.push(`Cadence: ${streams.cadence[idx]} rpm`);
-              }
-              if (streams.watts && streams.watts[idx]) {
-                parts.push(`Power: ${streams.watts[idx]} W`);
-              }
-              if (streams.velocity_smooth && streams.velocity_smooth[idx]) {
-                parts.push(`Speed: ${(streams.velocity_smooth[idx] * 3.6).toFixed(1)} km/h`);
-              }
-              return parts;
-            }
-          }
-        }
+        tooltip: { enabled: false }
       },
       scales: {
         x: {
@@ -1051,6 +1018,8 @@ function highlightPoint(index) {
 
   els.hoverElevation.textContent = streams.altitude?.[index]
     ? `${streams.altitude[index].toFixed(0)} m` : '—';
+  els.hoverDistance.textContent = streams.distance?.[index]
+    ? `${(streams.distance[index] / 1000).toFixed(2)} km` : '—';
   els.hoverGradient.textContent = streams.grade_smooth?.[index] !== undefined
     ? `${streams.grade_smooth[index].toFixed(1)}%` : '—';
   els.hoverSpeed.textContent = streams.velocity_smooth?.[index]
