@@ -1665,8 +1665,7 @@ function createGearMesh(teeth, module_, thickness, holeRadius, material) {
   const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
   geometry.center();
   const mesh = new THREE.Mesh(geometry, material);
-  // Rotate so the face is in the XY plane, thickness along Z
-  mesh.rotation.x = Math.PI / 2;
+  // Gear face is in XY plane, thickness along Z (axle direction)
   return mesh;
 }
 
