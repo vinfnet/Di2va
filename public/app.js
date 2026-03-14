@@ -623,6 +623,7 @@ const magnifyPlugin = {
   id: 'magnify',
   _mouse: { x: -1000, y: -1000, active: false },
   _drawing: false,
+  _snapshot: null,
   RADIUS: 80,
   ZOOM: 2.5,
 
@@ -642,7 +643,6 @@ const magnifyPlugin = {
     } else if (event.type === 'mouseout') {
       this._mouse.active = false;
     }
-    // Chart redraws naturally via interaction/tooltip — no manual draw() needed
   },
 
   afterDraw(chart) {
@@ -654,30 +654,35 @@ const magnifyPlugin = {
     const zoom = this.ZOOM;
     const canvas = chart.canvas;
     const ctx = chart.ctx;
-    const dpr = window.devicePixelRatio || 1;
 
-    // Capture the current chart render as a snapshot before we draw on top
-    // (the chart has already finished drawing at this point in afterDraw)
+    // Capture the fully-rendered chart to an offscreen canvas BEFORE we draw on it
+    if (!this._snapshot) {
+      this._snapshot = document.createElement('canvas');
+    }
+    this._snapshot.width = canvas.width;
+    this._snapshot.height = canvas.height;
+    this._snapshot.getContext('2d').drawImage(canvas, 0, 0);
+
+    const dpr = window.devicePixelRatio || 1;
+    const srcSize = (R * 2) / zoom;
+    const sx = (x - srcSize / 2) * dpr;
+    const sy = (y - srcSize / 2) * dpr;
 
     ctx.save();
 
-    // --- Clip to circle at cursor ---
+    // Clip to circle at cursor
     ctx.beginPath();
     ctx.arc(x, y, R, 0, Math.PI * 2);
     ctx.clip();
 
-    // --- Fill background inside lens (dark) ---
+    // Dark background fill
     ctx.fillStyle = '#0f1117';
     ctx.fillRect(x - R, y - R, R * 2, R * 2);
 
-    // --- Draw zoomed portion of the chart canvas ---
-    const srcSize = (R * 2) / zoom;
-    const sx = x - srcSize / 2;
-    const sy = y - srcSize / 2;
-
+    // Draw zoomed portion from the snapshot (not the live canvas)
     ctx.drawImage(
-      canvas,
-      sx * dpr, sy * dpr,
+      this._snapshot,
+      sx, sy,
       srcSize * dpr, srcSize * dpr,
       x - R, y - R,
       R * 2, R * 2
@@ -685,7 +690,7 @@ const magnifyPlugin = {
 
     ctx.restore();
 
-    // --- Draw lens border ring ---
+    // Lens border
     ctx.save();
     ctx.beginPath();
     ctx.arc(x, y, R, 0, Math.PI * 2);
@@ -693,14 +698,13 @@ const magnifyPlugin = {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Inner shadow ring
     ctx.beginPath();
     ctx.arc(x, y, R - 1, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Crosshair at centre
+    // Crosshair
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);
@@ -715,6 +719,49 @@ const magnifyPlugin = {
     this._drawing = false;
   }
 };
+
+// ─── Shift Arrow Icons ──────────────────────────────────────────────────────
+
+/**
+ * Pre-render arrow icons as small canvases for use as Chart.js pointStyle.
+ * This guarantees exact vertical orientation regardless of Chart.js rotation bugs.
+ */
+function createArrowIcon(direction, fillColor, size) {
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d');
+  const mid = size / 2;
+  const pad = 2;
+
+  ctx.fillStyle = fillColor;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+
+  ctx.beginPath();
+  if (direction === 'up') {
+    // Arrow pointing UP: vertex at top
+    ctx.moveTo(mid, pad);
+    ctx.lineTo(size - pad, size - pad);
+    ctx.lineTo(pad, size - pad);
+  } else {
+    // Arrow pointing DOWN: vertex at bottom
+    ctx.moveTo(pad, pad);
+    ctx.lineTo(size - pad, pad);
+    ctx.lineTo(mid, size - pad);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  return c;
+}
+
+// Cache the arrow icons so we don't recreate them every render
+const ARROW_SIZE = 18;
+const arrowUpRed = createArrowIcon('up', '#ef4444', ARROW_SIZE);
+const arrowDownBlue = createArrowIcon('down', '#3b82f6', ARROW_SIZE);
 
 // ─── Elevation Chart ────────────────────────────────────────────────────────
 
@@ -813,23 +860,16 @@ function updateElevationChart() {
     datasets.push({
       label: 'Gear Shifts',
       data: shiftData,
-      borderColor: (ctx) => {
-        const dir = shiftDirection[ctx.dataIndex];
-        return dir === 'up' ? '#ffffff' : dir === 'down' ? '#ffffff' : 'transparent';
-      },
-      backgroundColor: (ctx) => {
-        const dir = shiftDirection[ctx.dataIndex];
-        return dir === 'up' ? '#ef4444' : dir === 'down' ? '#3b82f6' : 'transparent';
-      },
-      borderWidth: 2,
-      pointRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? 9 : 0,
-      pointHoverRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? 12 : 0,
+      borderColor: 'transparent',
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      pointRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? ARROW_SIZE / 2 : 0,
+      pointHoverRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? ARROW_SIZE / 2 + 2 : 0,
       pointStyle: (ctx) => {
-        return shiftData[ctx.dataIndex] !== null ? 'triangle' : false;
-      },
-      rotation: (ctx) => {
-        // 0 = triangle pointing up, 180 = pointing down
-        return shiftDirection[ctx.dataIndex] === 'down' ? 180 : 0;
+        const dir = shiftDirection[ctx.dataIndex];
+        if (dir === 'up') return arrowUpRed;
+        if (dir === 'down') return arrowDownBlue;
+        return false;
       },
       fill: false,
       showLine: false,
