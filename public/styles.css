@@ -1048,3 +1048,152 @@ a:hover { color: var(--accent-hover); }
   border-color: rgba(255, 255, 255, 0.18);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
+
+/* ─── AI Analysis ────────────────────────────────────────────────── */
+.btn-accent {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 0.15s;
+}
+
+.btn-accent:hover {
+  opacity: 0.85;
+}
+
+.ai-analysis-card {
+  max-width: 680px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.ai-loading {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.ai-loading .spinner {
+  margin: 0 auto 16px;
+}
+
+.ai-loading-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.ai-rating {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.ai-rating-stars {
+  font-size: 2rem;
+  color: #fbbf24;
+  letter-spacing: 4px;
+}
+
+.ai-rating-label {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.ai-rating-percent {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.ai-components {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.ai-comp {
+  display: grid;
+  grid-template-columns: 150px 1fr 45px;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-comp-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.ai-comp-bar {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ai-comp-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.ai-comp-pct {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+.ai-summary {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  font-family: inherit;
+  color: var(--text);
+  margin-bottom: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.ai-activities h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.ai-activities-table {
+  width: 100%;
+  font-size: 0.8rem;
+  border-collapse: collapse;
+}
+
+.ai-activities-table th {
+  text-align: left;
+  padding: 6px 8px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-activities-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-error-text {
+  color: var(--red, #ef4444);
+  text-align: center;
+  padding: 20px;
+}

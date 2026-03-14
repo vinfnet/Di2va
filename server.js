@@ -594,6 +594,386 @@ app.post('/api/estimate-gears', express.json(), (req, res) => {
   res.json({ gears: gearData });
 });
 
+// ─── AI Shifting Analysis ───────────────────────────────────────────────────
+
+/**
+ * Cycling best-practice shifting rules:
+ * - Target cadence: 80–100 RPM (optimal ~90 RPM) — lower is grinding, higher is spinning out
+ * - Gradient response: shift to easier gear before/during climbs, harder on descents
+ * - Cross-chaining: avoid big chainring + big cog, or small chainring + small cog
+ * - Shift smoothness: avoid rapid gear hunting (>3 shifts in 10 seconds)
+ * - Anticipatory shifting: should shift BEFORE gradient steepens, not after
+ *
+ * Sources:
+ *   - Shimano shifting guides: shift under light load, anticipate terrain
+ *   - British Cycling / TrainingPeaks: 80-100 RPM target for most riding
+ *   - Cross-chain guidance: increases wear, reduces efficiency
+ */
+
+const CHAINRINGS_ANALYSIS = [34, 50];
+const CASSETTE_ANALYSIS = [11, 12, 13, 14, 15, 17, 19, 21, 23, 25, 28];
+const WHEEL_CIRC = 2.105;
+
+function buildGearTable() {
+  const gears = [];
+  for (const front of CHAINRINGS_ANALYSIS) {
+    for (const rear of CASSETTE_ANALYSIS) {
+      gears.push({ front, rear, ratio: front / rear });
+    }
+  }
+  return gears.sort((a, b) => a.ratio - b.ratio);
+}
+
+function isCrossChained(front, rear) {
+  const bigChainring = Math.max(...CHAINRINGS_ANALYSIS);
+  const smallChainring = Math.min(...CHAINRINGS_ANALYSIS);
+  const bigCog = Math.max(...CASSETTE_ANALYSIS);
+  const smallCog = Math.min(...CASSETTE_ANALYSIS);
+  const cassetteMid = CASSETTE_ANALYSIS.length / 2;
+  const cogIndex = CASSETTE_ANALYSIS.indexOf(rear);
+
+  // Big-big: big chainring + 3 biggest cogs
+  if (front === bigChainring && cogIndex >= CASSETTE_ANALYSIS.length - 3) return true;
+  // Small-small: small chainring + 3 smallest cogs
+  if (front === smallChainring && cogIndex <= 2) return true;
+  return false;
+}
+
+/**
+ * For a given speed (m/s) and target cadence (RPM), find the optimal gear.
+ */
+function optimalGearForConditions(speed, gradient, gearTable) {
+  if (speed < 0.5) return null;
+
+  // Adjust target cadence based on gradient
+  // Climbing: lower cadence is acceptable (75-90), flat: 85-95, descending: 90-100
+  let targetCadence;
+  if (gradient > 8) targetCadence = 75;
+  else if (gradient > 5) targetCadence = 80;
+  else if (gradient > 2) targetCadence = 85;
+  else if (gradient > -2) targetCadence = 90;
+  else if (gradient > -5) targetCadence = 92;
+  else targetCadence = 95;
+
+  // speed = (cadence / 60) * ratio * wheelCircumference
+  // ratio = speed / ((cadence / 60) * wheelCircumference)
+  const idealRatio = speed / ((targetCadence / 60) * WHEEL_CIRC);
+
+  // Find closest gear, preferring non-cross-chained
+  let bestGear = null;
+  let bestScore = Infinity;
+
+  for (const g of gearTable) {
+    const ratioDiff = Math.abs(g.ratio - idealRatio);
+    const crossPenalty = isCrossChained(g.front, g.rear) ? 0.3 : 0;
+    const score = ratioDiff + crossPenalty;
+    if (score < bestScore) {
+      bestScore = score;
+      bestGear = g;
+    }
+  }
+  return bestGear;
+}
+
+function analyseShifting(streams, gearData) {
+  const gearTable = buildGearTable();
+  const len = Math.min(
+    streams.distance?.length || 0,
+    streams.cadence?.length || 0,
+    streams.velocity_smooth?.length || 0,
+    gearData.length
+  );
+
+  if (len === 0) return null;
+
+  let cadenceScore = 0, cadenceCount = 0;
+  let crossChainCount = 0, totalGearPoints = 0;
+  let gearHuntingPenalty = 0;
+  let gradientMatchScore = 0, gradientMatchCount = 0;
+  const optimalGears = [];
+
+  // Track recent shifts for gear hunting detection
+  const recentShifts = [];
+
+  for (let i = 0; i < len; i++) {
+    const g = gearData[i];
+    const cadence = streams.cadence?.[i];
+    const speed = streams.velocity_smooth?.[i] || 0;
+    const gradient = streams.grade_smooth?.[i] || 0;
+    const time = streams.time?.[i] || i;
+
+    // Optimal gear for this point
+    const optimal = optimalGearForConditions(speed, gradient, gearTable);
+    optimalGears.push(optimal ? { front: optimal.front, rear: optimal.rear } : null);
+
+    if (!g?.front || !g?.rear || speed < 0.5) continue;
+
+    totalGearPoints++;
+
+    // 1. Cadence scoring (30%)
+    if (cadence && cadence > 0) {
+      cadenceCount++;
+      if (cadence >= 80 && cadence <= 100) {
+        cadenceScore += 1.0; // Perfect range
+      } else if (cadence >= 70 && cadence <= 110) {
+        cadenceScore += 0.6; // Acceptable
+      } else if (cadence >= 60 && cadence <= 120) {
+        cadenceScore += 0.3; // Poor
+      }
+      // else 0 — very poor
+    }
+
+    // 2. Cross-chain check (15%)
+    if (isCrossChained(g.front, g.rear)) {
+      crossChainCount++;
+    }
+
+    // 3. Gradient matching (25%)
+    if (optimal) {
+      const actualRatio = g.front / g.rear;
+      const optimalRatio = optimal.ratio;
+      const ratioDiff = Math.abs(actualRatio - optimalRatio);
+      if (ratioDiff < 0.2) gradientMatchScore += 1.0;
+      else if (ratioDiff < 0.5) gradientMatchScore += 0.6;
+      else if (ratioDiff < 1.0) gradientMatchScore += 0.3;
+      gradientMatchCount++;
+    }
+
+    // 4. Gear hunting detection (15%)
+    if (i > 0 && gearData[i - 1]?.front && gearData[i - 1]?.rear) {
+      const prev = gearData[i - 1];
+      if (g.front !== prev.front || g.rear !== prev.rear) {
+        recentShifts.push(time);
+        // Count shifts in last ~10 data points
+        const windowStart = time - 15;
+        const windowShifts = recentShifts.filter(t => t >= windowStart).length;
+        if (windowShifts > 3) gearHuntingPenalty++;
+      }
+    }
+  }
+
+  if (totalGearPoints === 0) return null;
+
+  // Compute component scores (0-1)
+  const cadenceComponent = cadenceCount > 0 ? cadenceScore / cadenceCount : 0.5;
+  const crossChainComponent = 1 - (crossChainCount / totalGearPoints);
+  const gradientComponent = gradientMatchCount > 0 ? gradientMatchScore / gradientMatchCount : 0.5;
+  const huntingComponent = Math.max(0, 1 - (gearHuntingPenalty / (totalGearPoints * 0.05)));
+
+  // Weighted overall score
+  const overall = (
+    cadenceComponent * 0.30 +
+    crossChainComponent * 0.15 +
+    gradientComponent * 0.25 +
+    huntingComponent * 0.15 +
+    0.15 * ((cadenceComponent + gradientComponent) / 2) // Anticipatory bonus
+  );
+
+  // Convert to 1-5 scale
+  const rating = Math.max(1, Math.min(5, Math.round(overall * 5)));
+
+  return {
+    rating,
+    overall: (overall * 100).toFixed(0),
+    components: {
+      cadence: { score: (cadenceComponent * 100).toFixed(0), label: 'Cadence Efficiency' },
+      crossChain: { score: (crossChainComponent * 100).toFixed(0), label: 'Cross-Chain Avoidance' },
+      gradient: { score: (gradientComponent * 100).toFixed(0), label: 'Gradient Matching' },
+      hunting: { score: (huntingComponent * 100).toFixed(0), label: 'Shift Smoothness' }
+    },
+    stats: {
+      totalPoints: totalGearPoints,
+      crossChainPercent: ((crossChainCount / totalGearPoints) * 100).toFixed(1),
+      avgCadenceInRange: cadenceCount > 0 ? ((cadenceScore / cadenceCount) * 100).toFixed(0) : 'N/A'
+    },
+    optimalGears
+  };
+}
+
+app.get('/api/ai-analysis', async (req, res) => {
+  const token = await ensureValidToken(req);
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const apiClient = stravaApi(token);
+
+    // Fetch last 10 activities
+    const activitiesRes = await apiClient.get('/athlete/activities', {
+      params: { page: 1, per_page: 10 }
+    });
+    const rides = activitiesRes.data.filter(a => a.type === 'Ride' || a.type === 'VirtualRide');
+
+    if (rides.length === 0) {
+      return res.json({ error: 'No rides found' });
+    }
+
+    console.log(`🤖 AI Analysis: processing ${rides.length} rides...`);
+
+    const activityResults = [];
+    let aggregateScores = { cadence: 0, crossChain: 0, gradient: 0, hunting: 0 };
+    let analysedCount = 0;
+
+    for (const ride of rides.slice(0, 10)) {
+      try {
+        // Fetch streams
+        const streamTypes = 'time,latlng,altitude,distance,cadence,watts,grade_smooth,velocity_smooth';
+        const streamsRes = await apiClient.get(`/activities/${ride.id}/streams`, {
+          params: { keys: streamTypes, key_type: 'distance' }
+        });
+
+        const streams = {};
+        streamsRes.data.forEach(s => { streams[s.type] = s.data; });
+
+        if (!streams.cadence || !streams.velocity_smooth) continue;
+
+        // Estimate gears
+        const gearData = [];
+        for (let i = 0; i < streams.cadence.length; i++) {
+          const rpm = streams.cadence[i];
+          const speed = streams.velocity_smooth[i];
+          if (rpm <= 0 || speed <= 0.5) {
+            gearData.push({ front: null, rear: null });
+            continue;
+          }
+          const actualRatio = (speed / (rpm / 60)) / WHEEL_CIRC;
+          let bestMatch = null, bestDiff = Infinity;
+          for (const front of CHAINRINGS_ANALYSIS) {
+            for (const rear of CASSETTE_ANALYSIS) {
+              const diff = Math.abs((front / rear) - actualRatio);
+              if (diff < bestDiff) { bestDiff = diff; bestMatch = { front, rear }; }
+            }
+          }
+          gearData.push(bestMatch || { front: null, rear: null });
+        }
+
+        const result = analyseShifting(streams, gearData);
+        if (result) {
+          activityResults.push({
+            id: ride.id,
+            name: ride.name,
+            date: ride.start_date_local,
+            rating: result.rating,
+            overall: result.overall
+          });
+          aggregateScores.cadence += parseFloat(result.components.cadence.score);
+          aggregateScores.crossChain += parseFloat(result.components.crossChain.score);
+          aggregateScores.gradient += parseFloat(result.components.gradient.score);
+          aggregateScores.hunting += parseFloat(result.components.hunting.score);
+          analysedCount++;
+        }
+      } catch (e) {
+        console.warn(`  Skipping ride ${ride.id}: ${e.message}`);
+      }
+    }
+
+    if (analysedCount === 0) {
+      return res.json({ error: 'No rides with sufficient data for analysis' });
+    }
+
+    // Average scores
+    const avg = {
+      cadence: (aggregateScores.cadence / analysedCount).toFixed(0),
+      crossChain: (aggregateScores.crossChain / analysedCount).toFixed(0),
+      gradient: (aggregateScores.gradient / analysedCount).toFixed(0),
+      hunting: (aggregateScores.hunting / analysedCount).toFixed(0)
+    };
+
+    const overallPct = (
+      avg.cadence * 0.30 + avg.crossChain * 0.15 +
+      avg.gradient * 0.25 + avg.hunting * 0.15 +
+      0.15 * ((parseFloat(avg.cadence) + parseFloat(avg.gradient)) / 2)
+    );
+    const overallRating = Math.max(1, Math.min(5, Math.round(overallPct / 20)));
+
+    // Generate text summary
+    const stars = '★'.repeat(overallRating) + '☆'.repeat(5 - overallRating);
+    let summary = `Shifting Analysis — ${stars} (${overallRating}/5)\n`;
+    summary += `Based on your last ${analysedCount} ride${analysedCount > 1 ? 's' : ''}:\n\n`;
+
+    // Cadence feedback
+    if (parseInt(avg.cadence) >= 80) {
+      summary += `✅ Cadence Efficiency (${avg.cadence}%): Excellent — you're maintaining a healthy cadence range (80–100 RPM) through most of your rides. This is kind to your knees and efficient for power delivery.\n\n`;
+    } else if (parseInt(avg.cadence) >= 60) {
+      summary += `⚠️ Cadence Efficiency (${avg.cadence}%): Room for improvement — you're often riding outside the optimal 80–100 RPM range. Try shifting to an easier gear on climbs rather than grinding at low cadence, and shift harder on descents to avoid spinning out.\n\n`;
+    } else {
+      summary += `❌ Cadence Efficiency (${avg.cadence}%): Needs attention — you're frequently grinding in too hard a gear or spinning too fast. The target is 80–100 RPM for most conditions. Shift earlier and more frequently to stay in the sweet spot.\n\n`;
+    }
+
+    // Cross-chain feedback
+    if (parseInt(avg.crossChain) >= 90) {
+      summary += `✅ Cross-Chain Avoidance (${avg.crossChain}%): Great — you're rarely cross-chaining. This reduces drivetrain wear and improves efficiency.\n\n`;
+    } else if (parseInt(avg.crossChain) >= 70) {
+      summary += `⚠️ Cross-Chain Avoidance (${avg.crossChain}%): Moderate — you're sometimes in big/big or small/small combinations. Try to avoid the big chainring with the 3 largest cogs, or the small chainring with the 3 smallest cogs.\n\n`;
+    } else {
+      summary += `❌ Cross-Chain Avoidance (${avg.crossChain}%): High cross-chain usage — shift to the other chainring more often. Cross-chaining increases wear and reduces power transfer.\n\n`;
+    }
+
+    // Gradient matching feedback
+    if (parseInt(avg.gradient) >= 75) {
+      summary += `✅ Gradient Matching (${avg.gradient}%): Good — your gear selection matches the terrain well. You're choosing appropriate gears for climbs, flats, and descents.\n\n`;
+    } else if (parseInt(avg.gradient) >= 50) {
+      summary += `⚠️ Gradient Matching (${avg.gradient}%): Fair — you could better match your gearing to the gradient. Consider shifting to easier gears earlier when approaching a climb, and harder gears as the road levels out.\n\n`;
+    } else {
+      summary += `❌ Gradient Matching (${avg.gradient}%): Poor terrain matching — you're often in the wrong gear for the gradient. Anticipate hills by shifting before the gradient increases.\n\n`;
+    }
+
+    // Shift smoothness feedback
+    if (parseInt(avg.hunting) >= 85) {
+      summary += `✅ Shift Smoothness (${avg.hunting}%): Smooth shifting — you're not gear hunting. Consistent gear choices show good judgment.\n\n`;
+    } else if (parseInt(avg.hunting) >= 60) {
+      summary += `⚠️ Shift Smoothness (${avg.hunting}%): Some gear hunting detected — you're occasionally shifting back and forth rapidly. Try to commit to a gear and give it a few seconds before deciding to shift again.\n\n`;
+    } else {
+      summary += `❌ Shift Smoothness (${avg.hunting}%): Frequent gear hunting — lots of rapid back-and-forth shifts. This suggests indecision or incorrect initial gear choice. Anticipate the terrain and commit to your shift.\n\n`;
+    }
+
+    summary += `💡 Tip: The optimal cadence for road cycling is 80–100 RPM for most riders. Shift to maintain this range as the terrain changes. Anticipate gradient changes and shift before the hill, not on it.`;
+
+    console.log(`🤖 AI Analysis complete: ${overallRating}/5 across ${analysedCount} rides`);
+
+    res.json({
+      rating: overallRating,
+      overallPercent: overallPct.toFixed(0),
+      summary,
+      components: {
+        cadence: avg.cadence,
+        crossChain: avg.crossChain,
+        gradient: avg.gradient,
+        hunting: avg.hunting
+      },
+      activities: activityResults,
+      analysedCount
+    });
+
+  } catch (err) {
+    console.error('AI Analysis error:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to run analysis' });
+  }
+});
+
+/**
+ * Get optimal gear overlay data for the currently viewed activity.
+ * Uses the same analysis engine but returns per-point optimal gears.
+ */
+app.post('/api/optimal-gears', express.json(), (req, res) => {
+  const { cadence, velocity_smooth, grade_smooth, distance } = req.body;
+
+  if (!cadence || !velocity_smooth) {
+    return res.status(400).json({ error: 'Cadence and speed data required' });
+  }
+
+  const gearTable = buildGearTable();
+  const optimalGears = [];
+
+  for (let i = 0; i < cadence.length; i++) {
+    const speed = velocity_smooth[i] || 0;
+    const gradient = grade_smooth?.[i] || 0;
+    const optimal = optimalGearForConditions(speed, gradient, gearTable);
+    optimalGears.push(optimal ? { front: optimal.front, rear: optimal.rear } : null);
+  }
+
+  res.json({ optimalGears });
+});
+
 // ─── FIT Library — Auto-match FIT files to Strava activities ────────────────
 
 /**

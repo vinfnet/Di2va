@@ -106,6 +106,13 @@
             Upload FIT File
           </button>
           <input type="file" id="fit-file-input" accept=".fit" class="hidden">
+          <button id="btn-ai-analysis" class="btn btn-accent">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M12 2a4 4 0 014 4c0 1.1-.9 2-2 2h-4a2 2 0 01-2-2 4 4 0 014-4zm-3 8h6l1 10H8l1-10z"/>
+              <circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/>
+            </svg>
+            AI Analysis
+          </button>
           <button id="btn-load-more" class="btn btn-outline">Load More</button>
         </div>
       </div>
@@ -199,6 +206,10 @@
               <input type="checkbox" id="toggle-cadence">
               <span>Show cadence</span>
             </label>
+            <label class="toggle-label">
+              <input type="checkbox" id="toggle-optimal-gear">
+              <span>Show optimal gear</span>
+            </label>
             <button id="btn-reset-zoom" class="btn btn-sm btn-outline hidden" title="Reset zoom">Reset Zoom</button>
             <button id="btn-fullscreen-elevation" class="btn-fullscreen" title="Toggle fullscreen">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -268,6 +279,32 @@
         <div id="gear-popup-info" class="gear-popup-info"></div>
         <div id="gear-popup-nav" class="gear-popup-nav"></div>
         <div class="gear-popup-hint">← → arrow keys to change gear</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Analysis Modal -->
+  <div id="ai-analysis-modal" class="modal-overlay hidden">
+    <div class="modal-card ai-analysis-card">
+      <div class="modal-header">
+        <h3>🤖 AI Shifting Analysis</h3>
+        <button id="btn-close-ai-analysis" class="btn btn-sm btn-outline">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="ai-analysis-loading" class="ai-loading">
+          <div class="spinner"></div>
+          <span>Analysing your last 10 rides...</span>
+          <p class="ai-loading-hint">This fetches data from Strava for each ride — it may take a moment.</p>
+        </div>
+        <div id="ai-analysis-results" class="hidden">
+          <div id="ai-rating" class="ai-rating"></div>
+          <div id="ai-components" class="ai-components"></div>
+          <pre id="ai-summary" class="ai-summary"></pre>
+          <div id="ai-activities" class="ai-activities"></div>
+        </div>
+        <div id="ai-analysis-error" class="hidden">
+          <p id="ai-error-text" class="ai-error-text"></p>
+        </div>
       </div>
     </div>
   </div>
