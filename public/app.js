@@ -987,15 +987,16 @@ function updateElevationChart() {
         tooltip: { enabled: false },
         zoom: {
           pan: {
-            enabled: true,
-            mode: 'x',
-            modifierKey: null
+            enabled: false
           },
           zoom: {
-            wheel: { enabled: true, speed: 0.05 },
-            pinch: { enabled: true },
+            wheel: { enabled: false },
+            pinch: { enabled: false },
             drag: {
-              enabled: false
+              enabled: true,
+              backgroundColor: 'rgba(252, 76, 2, 0.15)',
+              borderColor: 'rgba(252, 76, 2, 0.6)',
+              borderWidth: 1
             },
             mode: 'x',
             onZoomComplete: () => {
