@@ -8,6 +8,10 @@
 
 *A ride loaded in Di2va — map colored by gear, elevation profile with gear/gradient overlay, hover panel showing live data, and gear usage summary with clickable statistics.*
 
+![Di2va elevation analysis](docs/screenshots/di2va-elevation-analysis.png)
+
+*Detailed elevation analysis — zoom in to compare elevation against cadence (green) with gear shift markers (▲ upshift, ▼ downshift). Hover over any point to see gear, speed, cadence, power, and gradient.*
+
 ## Why?
 
 I'm a keen cyclist — nothing serious, very much an amateur — but I'm genuinely interested in the tech side of riding. I run a Shimano Di2 electronic groupset on my bike and became increasingly frustrated that **Strava still does not include Di2 electronic shifter data in its ride analysis**. The gear data is right there in the FIT file uploaded by my bike computer, but Strava just ignores it.
