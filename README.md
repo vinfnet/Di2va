@@ -157,12 +157,6 @@ MIT
 
 ---
 
-<sub>
-
-**This code is AI-generated.** Built using [Visual Studio Code](https://code.visualstudio.com/download) with [GitHub Copilot](https://github.com/features/copilot) powered by the **Claude Opus 4.6** model by [Anthropic](https://www.anthropic.com/).
-
-Download VS Code: [https://code.visualstudio.com/download](https://code.visualstudio.com/download)
-
-**Author:** [vinfnet](https://github.com/vinfnet) — This is a personal project and is not affiliated with, endorsed by, or connected to my employer in any way. I do not endorse any of the technologies, products, or services mentioned (Strava, Shimano, Di2, Garmin, etc.) — I simply find this a useful way to experiment with cycling data and AI-assisted development.
-
-</sub>
+<sub>**This code is AI-generated.** Built using <a href="https://code.visualstudio.com/download">Visual Studio Code</a> with <a href="https://github.com/features/copilot">GitHub Copilot</a> powered by the <b>Claude Opus 4.6</b> model by <a href="https://www.anthropic.com/">Anthropic</a>.<br>
+Download VS Code: <a href="https://code.visualstudio.com/download">https://code.visualstudio.com/download</a><br><br>
+<b>Author:</b> <a href="https://github.com/vinfnet">vinfnet</a> — This is a personal project and is not affiliated with, endorsed by, or connected to my employer in any way. I do not endorse any of the technologies, products, or services mentioned (Strava, Shimano, Di2, Garmin, etc.) — I simply find this a useful way to experiment with cycling data and AI-assisted development.</sub>
