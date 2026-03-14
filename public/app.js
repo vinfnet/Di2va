@@ -119,6 +119,7 @@ const els = {
   hoverCadence:    $('hover-cadence'),
   hoverPower:      $('hover-power'),
   toggleGradient:  $('toggle-gradient'),
+  toggleCadence:   $('toggle-cadence'),
   btnDownloadFit:  $('btn-download-fit'),
   btnDownloadFitPanel: $('btn-download-fit-panel'),
   btnUploadFitPanel: $('btn-upload-fit-panel'),
@@ -180,6 +181,9 @@ async function init() {
   els.btnUploadFitDetail.addEventListener('click', () => els.fitFileInputDetail.click());
   els.fitFileInputDetail.addEventListener('change', handleFitUploadForActivity);
   els.toggleGradient.addEventListener('change', () => {
+    if (state.chart) updateElevationChart();
+  });
+  els.toggleCadence.addEventListener('change', () => {
     if (state.chart) updateElevationChart();
   });
 
@@ -855,6 +859,7 @@ function updateElevationChart() {
   const streams = state.streams;
   const gears = state.gearData;
   const showGradient = els.toggleGradient.checked;
+  const showCadence = els.toggleCadence.checked;
 
   if (state.chart) {
     state.chart.destroy();
@@ -970,6 +975,27 @@ function updateElevationChart() {
     });
   }
 
+  // Add cadence dataset
+  const cadenceData = [];
+  if (showCadence && streams.cadence) {
+    for (let i = 0; i < streams.cadence.length; i++) {
+      cadenceData.push(streams.cadence[i]);
+    }
+  }
+  if (showCadence && cadenceData.length > 0) {
+    datasets.push({
+      label: 'Cadence (rpm)',
+      data: cadenceData,
+      borderColor: 'rgba(34, 197, 94, 0.5)',
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      pointRadius: 0,
+      fill: false,
+      tension: 0.3,
+      yAxisID: 'y2'
+    });
+  }
+
   state.chart = new Chart(ctx, {
     type: 'line',
     data: { labels: distances, datasets },
@@ -1035,6 +1061,15 @@ function updateElevationChart() {
             position: 'right',
             title: { display: true, text: 'Gradient (%)', color: '#8b8fa3' },
             ticks: { color: '#8b8fa3' },
+            grid: { display: false }
+          }
+        } : {}),
+        ...(showCadence && cadenceData.length > 0 ? {
+          y2: {
+            display: true,
+            position: 'right',
+            title: { display: true, text: 'Cadence (rpm)', color: 'rgba(34, 197, 94, 0.7)' },
+            ticks: { color: 'rgba(34, 197, 94, 0.7)' },
             grid: { display: false }
           }
         } : {})
