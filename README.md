@@ -131,3 +131,15 @@ If your bike uses different gearing (e.g. 1x, different cassette), edit the cons
 ## License
 
 MIT
+
+---
+
+## Dev Note: Debugging 3D Gear Rotation with a Screenshot
+
+While building the interactive 3D drivetrain visualization (a Three.js WebGL scene showing the full Shimano cassette and chainrings spinning as if pedalling), I hit a problem that was almost impossible to describe in words: the gears were rotating "incorrectly." They were wobbling and tilting instead of spinning smoothly around their axles — but articulating *exactly* what was wrong in text was surprisingly hard.
+
+The fix came from something simple: **I took a screenshot of the broken visualization and dropped it straight into the chat session with Claude Opus (via GitHub Copilot in VS Code).**
+
+Claude immediately identified the issue from the image — the gear meshes had been tipped 90° by a stale `rotation.x = Math.PI / 2` that put the gear faces into the XZ plane instead of XY. When the rotation groups then spun around Z (the intended axle), the gears wobbled in 3D space instead of spinning flat. A one-line fix.
+
+**The takeaway:** for visual/spatial bugs, a screenshot can communicate in an instant what paragraphs of text cannot. Multimodal AI chat (text + images) turns "the gears are rotating wrong" into an immediately diagnosable problem — the model can *see* the 3D orientation mismatch just as a human collaborator would.
