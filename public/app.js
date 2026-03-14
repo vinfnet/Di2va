@@ -370,7 +370,8 @@ function countGearShifts() {
 
 /**
  * Get indices in state.gearData where a gear shift occurred.
- * Returns array of { index, type: 'rear'|'front'|'both' }
+ * Returns array of { index, type, direction } where direction is 'up' (harder)
+ * or 'down' (easier) based on gear ratio change.
  */
 function getShiftIndices() {
   const gears = state.gearData;
@@ -382,9 +383,13 @@ function getShiftIndices() {
     const rearChanged = gears[i].rear !== gears[i - 1].rear;
     const frontChanged = gears[i].front !== gears[i - 1].front;
     if (rearChanged || frontChanged) {
+      // Gear ratio = front / rear. Higher ratio = harder gear = upshift
+      const prevRatio = (gears[i - 1].front || 50) / (gears[i - 1].rear || 15);
+      const newRatio = (gears[i].front || 50) / (gears[i].rear || 15);
       shifts.push({
         index: i,
-        type: (rearChanged && frontChanged) ? 'both' : rearChanged ? 'rear' : 'front'
+        type: (rearChanged && frontChanged) ? 'both' : rearChanged ? 'rear' : 'front',
+        direction: newRatio >= prevRatio ? 'up' : 'down'
       });
     }
   }
@@ -670,8 +675,11 @@ function updateElevationChart() {
   // Build shift marker data — sparse array with elevation only at shift points
   const shiftIndices = getShiftIndices();
   const shiftData = new Array(elevations.length).fill(null);
+  // Direction map: 'up' = harder gear (ratio increase), 'down' = easier gear
+  const shiftDirection = new Array(elevations.length).fill(null);
   shiftIndices.forEach(s => {
     shiftData[s.index] = elevations[s.index];
+    shiftDirection[s.index] = s.direction; // 'up' or 'down'
   });
 
   const datasets = [
@@ -699,17 +707,31 @@ function updateElevationChart() {
     }
   ];
 
-  // Add gear shift markers as red circles on the elevation line
+  // Add gear shift markers as directional arrows on the elevation line
+  // Up arrows (▲) = upshift (harder gear / higher ratio)
+  // Down arrows (▼) = downshift (easier gear / lower ratio)
   if (shiftIndices.length > 0) {
     datasets.push({
       label: 'Gear Shifts',
       data: shiftData,
-      borderColor: '#ef4444',
-      backgroundColor: '#ef4444',
-      borderWidth: 0,
-      pointRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? 3 : 0,
-      pointHoverRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? 5 : 0,
-      pointStyle: 'circle',
+      borderColor: (ctx) => {
+        const dir = shiftDirection[ctx.dataIndex];
+        return dir === 'up' ? '#ef4444' : dir === 'down' ? '#3b82f6' : 'transparent';
+      },
+      backgroundColor: (ctx) => {
+        const dir = shiftDirection[ctx.dataIndex];
+        return dir === 'up' ? '#ef4444' : dir === 'down' ? '#3b82f6' : 'transparent';
+      },
+      borderWidth: 1,
+      pointRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? 6 : 0,
+      pointHoverRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? 8 : 0,
+      pointStyle: (ctx) => {
+        return shiftData[ctx.dataIndex] !== null ? 'triangle' : 'circle';
+      },
+      rotation: (ctx) => {
+        // 0 = triangle pointing up, 180 = pointing down
+        return shiftDirection[ctx.dataIndex] === 'down' ? 180 : 0;
+      },
       fill: false,
       showLine: false,
       yAxisID: 'y',
