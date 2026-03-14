@@ -1008,9 +1008,38 @@ function highlightPoint(index) {
     }
   }
 
-  // Update hover info panel
+  // Update hover info panel — position it above the elevation chart, tracking cursor X
   const gears = state.gearData;
   els.hoverInfo.classList.remove('hidden');
+
+  // Position the panel above the magnifier lens, anchored to cursor X
+  const canvas = els.elevationChart;
+  if (canvas && state.chart) {
+    const rect = canvas.getBoundingClientRect();
+    const chartArea = state.chart.chartArea;
+    if (chartArea) {
+      // Cursor X in viewport coords
+      const dataLen = streams.latlng.length;
+      const pct = dataLen > 0 ? index / dataLen : 0.5;
+      const cursorXInChart = chartArea.left + pct * (chartArea.right - chartArea.left);
+      const cursorXViewport = rect.left + cursorXInChart;
+
+      // Place panel above the chart container with a gap
+      const panelGap = 8;
+      const panelHeight = els.hoverInfo.offsetHeight || 140;
+      let top = rect.top - panelHeight - panelGap;
+      if (top < 4) top = 4; // don't go off-screen
+
+      // Centre panel on cursor X, but clamp within viewport
+      const panelWidth = els.hoverInfo.offsetWidth || 180;
+      let left = cursorXViewport - panelWidth / 2;
+      left = Math.max(4, Math.min(left, window.innerWidth - panelWidth - 4));
+
+      els.hoverInfo.style.top = `${top}px`;
+      els.hoverInfo.style.left = `${left}px`;
+      els.hoverInfo.style.right = 'auto';
+    }
+  }
 
   if (gears && gears[index]?.front && gears[index]?.rear) {
     els.hoverGear.textContent = `${gears[index].front}/${gears[index].rear}`;

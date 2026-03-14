@@ -600,16 +600,17 @@ a:hover { color: var(--accent-hover); }
 /* ─── Hover Info Panel ───────────────────────────────────────────── */
 .hover-info {
   position: fixed;
-  top: 72px;
-  right: 24px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px;
-  min-width: 200px;
+  padding: 12px 14px;
+  min-width: 180px;
   box-shadow: var(--shadow);
-  z-index: 999;
-  font-size: 0.85rem;
+  z-index: 1100;
+  font-size: 0.82rem;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  white-space: nowrap;
 }
 
 .hover-info-row {
