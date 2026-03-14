@@ -275,30 +275,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <!-- Three.js (import-map for ESM modules) -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
-    }
-  }
-  </script>
-  <script type="module">
-    import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    window.THREE = THREE;
-    window.OrbitControls = OrbitControls;
-    // Signal that Three.js is ready, then load app
-    window.dispatchEvent(new Event('three-ready'));
-  </script>
-  <!-- App (deferred until Three.js loads) -->
-  <script>
-    window.addEventListener('three-ready', () => {
-      const s = document.createElement('script');
-      s.src = 'app.js';
-      document.body.appendChild(s);
-    });
-  </script>
+  <!-- App -->
+  <script src="app.js"></script>
 </body>
 </html>
