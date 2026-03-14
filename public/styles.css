@@ -307,6 +307,10 @@ a:hover { color: var(--accent-hover); }
   font-weight: 600;
 }
 
+.stat-bar .stat.shift-stat .value {
+  color: #ef4444;
+}
+
 .stat-bar .stat .label {
   font-size: 0.75rem;
   color: var(--text-muted);

@@ -301,6 +301,9 @@ function renderActivityStats(activity) {
   const avgWatts = activity.average_watts ? `${Math.round(activity.average_watts)}` : '—';
   const avgCadence = activity.average_cadence ? `${Math.round(activity.average_cadence)}` : '—';
 
+  // Count front/rear shifts from gear data
+  const shiftCounts = countGearShifts();
+
   els.detailStats.innerHTML = `
     <div class="stat"><span class="value">${distance} km</span><span class="label">Distance</span></div>
     <div class="stat"><span class="value">${elevation} m</span><span class="label">Elevation</span></div>
@@ -309,7 +312,62 @@ function renderActivityStats(activity) {
     <div class="stat"><span class="value">${maxSpeed} km/h</span><span class="label">Max Speed</span></div>
     <div class="stat"><span class="value">${avgWatts} W</span><span class="label">Avg Power</span></div>
     <div class="stat"><span class="value">${avgCadence} rpm</span><span class="label">Avg Cadence</span></div>
+    <div class="stat shift-stat"><span class="value">${shiftCounts.rear}</span><span class="label">Rear Shifts</span></div>
+    <div class="stat shift-stat"><span class="value">${shiftCounts.front}</span><span class="label">Front Shifts</span></div>
   `;
+}
+
+/**
+ * Count front and rear gear shifts.
+ * Uses FIT gear_changes if available, otherwise detects changes in gearData.
+ */
+function countGearShifts() {
+  // Prefer FIT gear change events (most accurate)
+  if (state.fitGearData?.gear_changes?.length > 0) {
+    const gc = state.fitGearData.gear_changes;
+    let rear = 0, front = 0;
+    gc.forEach(e => {
+      if (e.event_type === 'rear_gear_change') rear++;
+      else if (e.event_type === 'front_gear_change') front++;
+      else { rear++; } // generic gear_change — count as rear
+    });
+    return { rear, front, total: rear + front };
+  }
+
+  // Fall back to detecting changes in per-point gear data
+  const gears = state.gearData;
+  if (!gears || gears.length < 2) return { rear: 0, front: 0, total: 0 };
+
+  let rear = 0, front = 0;
+  for (let i = 1; i < gears.length; i++) {
+    if (!gears[i]?.rear || !gears[i - 1]?.rear) continue;
+    if (gears[i].rear !== gears[i - 1].rear) rear++;
+    if (gears[i].front !== gears[i - 1].front) front++;
+  }
+  return { rear, front, total: rear + front };
+}
+
+/**
+ * Get indices in state.gearData where a gear shift occurred.
+ * Returns array of { index, type: 'rear'|'front'|'both' }
+ */
+function getShiftIndices() {
+  const gears = state.gearData;
+  if (!gears || gears.length < 2) return [];
+
+  const shifts = [];
+  for (let i = 1; i < gears.length; i++) {
+    if (!gears[i]?.rear || !gears[i - 1]?.rear) continue;
+    const rearChanged = gears[i].rear !== gears[i - 1].rear;
+    const frontChanged = gears[i].front !== gears[i - 1].front;
+    if (rearChanged || frontChanged) {
+      shifts.push({
+        index: i,
+        type: (rearChanged && frontChanged) ? 'both' : rearChanged ? 'rear' : 'front'
+      });
+    }
+  }
+  return shifts;
 }
 
 function updateDataSourceBadge() {
@@ -539,6 +597,13 @@ function updateElevationChart() {
     }
   }
 
+  // Build shift marker data — sparse array with elevation only at shift points
+  const shiftIndices = getShiftIndices();
+  const shiftData = new Array(elevations.length).fill(null);
+  shiftIndices.forEach(s => {
+    shiftData[s.index] = elevations[s.index];
+  });
+
   const datasets = [
     {
       label: 'Elevation (m)',
@@ -563,6 +628,24 @@ function updateElevationChart() {
       yAxisID: 'y'
     }
   ];
+
+  // Add gear shift markers as red circles on the elevation line
+  if (shiftIndices.length > 0) {
+    datasets.push({
+      label: 'Gear Shifts',
+      data: shiftData,
+      borderColor: '#ef4444',
+      backgroundColor: '#ef4444',
+      borderWidth: 0,
+      pointRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? 3 : 0,
+      pointHoverRadius: (ctx) => shiftData[ctx.dataIndex] !== null ? 5 : 0,
+      pointStyle: 'circle',
+      fill: false,
+      showLine: false,
+      yAxisID: 'y',
+      order: -1  // draw on top
+    });
+  }
 
   // Add gradient dataset
   if (showGradient && gradients.length > 0) {
@@ -604,6 +687,7 @@ function updateElevationChart() {
               if (item.datasetIndex === 0) {
                 return `Elevation: ${item.raw.toFixed(0)} m`;
               }
+              if (item.dataset.label === 'Gear Shifts') return null;
               return `Gradient: ${item.raw.toFixed(1)}%`;
             },
             afterBody: (items) => {
@@ -914,6 +998,7 @@ async function parseFitFile(file, standalone) {
         mergeFitDataWithStreams(result);
         els.fitImportPanel.classList.add('hidden');
         updateDataSourceBadge();
+        renderActivityStats(state.currentActivity);  // refresh shift counts
         renderMap();
         updateElevationChart();
         renderGearLegend();
