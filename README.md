@@ -33,7 +33,7 @@ Visualize your Shimano Di2 gear shift data from Strava cycling activities — se
 
 ### 2. Configure Environment
 
-On first run the application will prompt to connect to your Strava account and store the API keys on your device - ensure the env 
+On first run the application will prompt to connect to your Strava account and store the API keys on your device - ensure the .env file is secure - it contains credentials to your Strava account.
 
 ```bash
 cp .env.example .env

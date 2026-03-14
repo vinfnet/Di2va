@@ -368,30 +368,71 @@ app.post('/api/parse-fit', upload.single('fitfile'), (req, res) => {
 });
 
 /**
+ * Decode gear data packed in a FIT event's uint32 `data` field.
+ * Layout: byte0 = rear_gear_num, byte1 = rear_gear_teeth,
+ *         byte2 = front_gear_num, byte3 = front_gear_teeth
+ */
+function decodeGearData(data) {
+  if (typeof data !== 'number' || data === 0) return null;
+  return {
+    rear_gear_num:    data & 0xFF,
+    rear_gear_teeth:  (data >> 8) & 0xFF,
+    front_gear_num:   (data >> 16) & 0xFF,
+    front_gear_teeth: (data >> 24) & 0xFF
+  };
+}
+
+/**
  * Extract Di2 gear shift data from parsed FIT file.
- * Looks for gear_change events and device-specific records.
+ * Handles rear_gear_change / front_gear_change events (Garmin)
+ * and the older gear_change event type.
  */
 function extractDi2Data(fitData) {
   const gearChanges = [];
   const records = [];
 
-  // Extract gear change events
+  // Extract gear change events — match all known event names
   if (fitData.events) {
     fitData.events.forEach(event => {
-      if (event.event === 'rider_position_change' ||
-          event.event === 'gear_change' ||
-          event.event_type === 'gear_change') {
-        gearChanges.push({
-          timestamp: event.timestamp,
-          rear_gear_num: event.rear_gear_num || event.data?.rear_gear_num,
-          rear_gear_teeth: event.rear_gear_teeth || event.data?.rear_gear_teeth,
-          front_gear_num: event.front_gear_num || event.data?.front_gear_num,
-          front_gear_teeth: event.front_gear_teeth || event.data?.front_gear_teeth,
-          gear_ratio: event.gear_ratio || null
-        });
+      const isGearEvent =
+        event.event === 'rear_gear_change' ||
+        event.event === 'front_gear_change' ||
+        event.event === 'gear_change' ||
+        event.event_type === 'gear_change';
+
+      if (!isGearEvent) return;
+
+      // Try named fields first (some parsers expand them),
+      // then decode from the packed uint32 data field
+      let rearNum   = event.rear_gear_num;
+      let rearTeeth = event.rear_gear_teeth;
+      let frontNum  = event.front_gear_num;
+      let frontTeeth = event.front_gear_teeth;
+
+      if (rearTeeth === undefined && event.data !== undefined) {
+        const decoded = decodeGearData(event.data);
+        if (decoded) {
+          rearNum   = decoded.rear_gear_num;
+          rearTeeth = decoded.rear_gear_teeth;
+          frontNum  = decoded.front_gear_num;
+          frontTeeth = decoded.front_gear_teeth;
+        }
       }
+
+      gearChanges.push({
+        timestamp: event.timestamp,
+        event_type: event.event,          // 'rear_gear_change' or 'front_gear_change'
+        rear_gear_num:    rearNum   || null,
+        rear_gear_teeth:  rearTeeth || null,
+        front_gear_num:   frontNum  || null,
+        front_gear_teeth: frontTeeth || null,
+        gear_ratio: (frontTeeth && rearTeeth) ? +(frontTeeth / rearTeeth).toFixed(2) : null
+      });
     });
   }
+
+  // Sort gear changes by timestamp (they should already be, but be safe)
+  gearChanges.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
   // Extract per-record data (records have timestamps, position, gear info etc.)
   if (fitData.records) {
@@ -410,7 +451,7 @@ function extractDi2Data(fitData) {
         temperature: record.temperature
       };
 
-      // Di2 specific fields that may appear in records
+      // Di2 specific fields that may appear directly in records
       if (record.rear_gear_num !== undefined) rec.rear_gear_num = record.rear_gear_num;
       if (record.rear_gear_teeth !== undefined) rec.rear_gear_teeth = record.rear_gear_teeth;
       if (record.front_gear_num !== undefined) rec.front_gear_num = record.front_gear_num;
@@ -421,55 +462,65 @@ function extractDi2Data(fitData) {
     });
   }
 
-  // If we have gear change events, merge them into the records
+  // Merge gear change events into records by timestamp
   if (gearChanges.length > 0 && records.length > 0) {
     let gearIdx = 0;
     let currentGear = {
-      front_gear_num: gearChanges[0].front_gear_num,
+      front_gear_num:   gearChanges[0].front_gear_num,
       front_gear_teeth: gearChanges[0].front_gear_teeth,
-      rear_gear_num: gearChanges[0].rear_gear_num,
-      rear_gear_teeth: gearChanges[0].rear_gear_teeth
+      rear_gear_num:    gearChanges[0].rear_gear_num,
+      rear_gear_teeth:  gearChanges[0].rear_gear_teeth
     };
 
     records.forEach(record => {
       // Advance gear index to match timestamp
       while (gearIdx < gearChanges.length &&
              new Date(gearChanges[gearIdx].timestamp) <= new Date(record.timestamp)) {
-        currentGear = {
-          front_gear_num: gearChanges[gearIdx].front_gear_num || currentGear.front_gear_num,
-          front_gear_teeth: gearChanges[gearIdx].front_gear_teeth || currentGear.front_gear_teeth,
-          rear_gear_num: gearChanges[gearIdx].rear_gear_num || currentGear.rear_gear_num,
-          rear_gear_teeth: gearChanges[gearIdx].rear_gear_teeth || currentGear.rear_gear_teeth
-        };
+        const gc = gearChanges[gearIdx];
+        // Each event carries full state (front + rear), so update all fields
+        if (gc.front_gear_num)   currentGear.front_gear_num   = gc.front_gear_num;
+        if (gc.front_gear_teeth) currentGear.front_gear_teeth = gc.front_gear_teeth;
+        if (gc.rear_gear_num)    currentGear.rear_gear_num    = gc.rear_gear_num;
+        if (gc.rear_gear_teeth)  currentGear.rear_gear_teeth  = gc.rear_gear_teeth;
         gearIdx++;
       }
 
       // Apply current gear to record if not already set
-      if (!record.rear_gear_num) record.rear_gear_num = currentGear.rear_gear_num;
-      if (!record.rear_gear_teeth) record.rear_gear_teeth = currentGear.rear_gear_teeth;
-      if (!record.front_gear_num) record.front_gear_num = currentGear.front_gear_num;
+      if (!record.rear_gear_num)    record.rear_gear_num    = currentGear.rear_gear_num;
+      if (!record.rear_gear_teeth)  record.rear_gear_teeth  = currentGear.rear_gear_teeth;
+      if (!record.front_gear_num)   record.front_gear_num   = currentGear.front_gear_num;
       if (!record.front_gear_teeth) record.front_gear_teeth = currentGear.front_gear_teeth;
 
       // Calculate gear ratio
       if (record.front_gear_teeth && record.rear_gear_teeth) {
-        record.gear_ratio = (record.front_gear_teeth / record.rear_gear_teeth).toFixed(2);
+        record.gear_ratio = +(record.front_gear_teeth / record.rear_gear_teeth).toFixed(2);
       }
     });
   }
 
-  // Extract device info
+  // Extract device info — match Shimano by string name or known manufacturer IDs
+  // (manufacturer 41 = Shimano in some FIT profiles, or appears as numeric when
+  //  the parser doesn't have the enum mapping)
+  const SHIMANO_MFR_IDS = [41, 'shimano'];
   const deviceInfo = fitData.device_infos || [];
   const di2Devices = deviceInfo.filter(d =>
-    d.manufacturer === 'shimano' ||
-    (d.product_name && d.product_name.toLowerCase().includes('di2'))
+    SHIMANO_MFR_IDS.includes(d.manufacturer) ||
+    (d.product_name && d.product_name.toLowerCase().includes('di2')) ||
+    (d.product_name && d.product_name.toLowerCase().includes('shimano'))
   );
+
+  const hasGearData = gearChanges.length > 0 ||
+                      records.some(r => r.rear_gear_num !== undefined);
+
+  console.log(`  Di2 extraction: ${gearChanges.length} gear changes, ` +
+              `${records.length} records, has_gear_data=${hasGearData}`);
 
   return {
     gear_changes: gearChanges,
     records: records,
     di2_devices: di2Devices,
     session: fitData.sessions?.[0] || null,
-    has_gear_data: gearChanges.length > 0 || records.some(r => r.rear_gear_num !== undefined)
+    has_gear_data: hasGearData
   };
 }
 
