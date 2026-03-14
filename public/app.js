@@ -1195,7 +1195,7 @@ async function autoMatchDi2Data(activity) {
   showAutoStatus('Checking for Di2 data...');
 
   try {
-    // Step 1: Check if a matching FIT file already exists
+    // Step 1: Check if a matching FIT file already exists in the library
     const result = await api(`/api/activity/${activity.id}/auto-fit?start_date=${encodeURIComponent(activity.start_date)}`);
 
     if (result.has_gear_data) {
@@ -1204,14 +1204,22 @@ async function autoMatchDi2Data(activity) {
       return;
     }
 
-    // Step 2: No match — trigger download from Strava and poll
-    console.log('[Di2va] No FIT match yet — triggering Strava download + polling...');
+    // Step 2: Try fetching FIT via server-side API (OAuth token, no browser popup)
+    showAutoStatus('Fetching FIT from Strava API...');
+    const apiResult = await api(`/api/activity/${activity.id}/fit-gear-data`);
+
+    if (apiResult.has_gear_data) {
+      console.log('[Di2va] Got Di2 data via server-side Strava API');
+      applyAutoMatchResult(apiResult);
+      return;
+    }
+
+    // Step 3: API didn't return gear data — try browser-cookie download + poll
+    console.log('[Di2va] Server API had no gear data — trying browser download...');
     showAutoStatus('Downloading FIT from Strava...');
+    triggerFitDownloadSilent();
 
-    // Open Strava's export URL (uses browser cookies to authenticate)
-    downloadFitFromStrava();
-
-    // Step 3: Poll for the FIT to appear in ~/Downloads
+    // Step 4: Poll for the FIT to appear in ~/Downloads
     const POLL_INTERVAL = 2000; // 2 seconds
     const MAX_POLLS = 15;       // 30 seconds max
     let polls = 0;
@@ -1300,7 +1308,7 @@ function showManualImportPanel() {
       <p>The automatic FIT download didn't complete. You can try again or upload manually:</p>
       <div class="fit-import-actions">
         <button id="btn-download-fit-panel" class="btn btn-strava" onclick="downloadFitFromStrava()">
-          ⬇ Download FIT from Strava
+          ⬇ Fetch FIT from Strava
         </button>
         <button id="btn-upload-fit-panel" class="btn btn-outline" onclick="document.getElementById('fit-file-input-detail').click()">
           📂 Choose FIT File
@@ -1311,16 +1319,48 @@ function showManualImportPanel() {
   `;
 }
 
-// ─── Download FIT from Strava (uses browser session cookies) ────────────────
+// ─── Download FIT from Strava ───────────────────────────────────────────────
 
-function downloadFitFromStrava() {
+/**
+ * Silent FIT download — uses a hidden iframe so no popup/tab appears.
+ * Falls back to window.open if iframe approach doesn't work.
+ */
+function triggerFitDownloadSilent() {
+  if (!state.currentActivity?.id) return;
+  const url = `https://www.strava.com/activities/${state.currentActivity.id}/export_original`;
+
+  // Create a hidden iframe to trigger the download without a visible tab
+  let iframe = document.getElementById('fit-download-frame');
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.id = 'fit-download-frame';
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+  }
+  iframe.src = url;
+}
+
+/**
+ * Manual FIT download button handler — tries server-side API first,
+ * then falls back to silent iframe download if no gear data returned.
+ */
+async function downloadFitFromStrava() {
   if (!state.currentActivity?.id) return;
 
-  // Open the Strava export URL — the browser will use its own Strava session
-  // cookies to authenticate, so if the user is logged into Strava in this
-  // browser, the .FIT file will download automatically.
-  const url = `https://www.strava.com/activities/${state.currentActivity.id}/export_original`;
-  window.open(url, '_blank');
+  // Try server-side API first (no browser download UI)
+  try {
+    showAutoStatus('Fetching FIT from Strava API...');
+    const result = await api(`/api/activity/${state.currentActivity.id}/fit-gear-data`);
+    if (result.has_gear_data) {
+      applyAutoMatchResult(result);
+      return;
+    }
+  } catch (err) {
+    console.warn('[Di2va] Server-side FIT fetch failed:', err.message);
+  }
+
+  // Fall back to hidden iframe download (uses browser Strava cookies)
+  triggerFitDownloadSilent();
 }
 
 // ─── Drag & Drop for .FIT Files ─────────────────────────────────────────────
