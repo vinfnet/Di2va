@@ -546,7 +546,15 @@ a:hover { color: var(--accent-hover); }
 
 .elevation-controls {
   display: flex;
+  align-items: center;
   gap: 16px;
+}
+
+.zoom-hint {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.6;
+  margin-left: auto;
 }
 
 .toggle-label {

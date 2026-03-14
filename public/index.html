@@ -190,6 +190,8 @@
               <input type="checkbox" id="toggle-gradient" checked>
               <span>Show gradient</span>
             </label>
+            <button id="btn-reset-zoom" class="btn btn-sm btn-outline hidden" title="Reset zoom">Reset Zoom</button>
+            <span class="zoom-hint">Scroll to zoom · Drag to pan</span>
           </div>
         </div>
         <div id="elevation-chart-wrapper">
@@ -277,6 +279,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Chart.js Zoom Plugin (includes Hammer.js for touch) -->
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <!-- App -->
   <script src="app.js"></script>
 </body>

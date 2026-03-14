@@ -107,6 +107,7 @@ const els = {
   dataSourceBadge: $('data-source-badge'),
   mapContainer:    $('map-container'),
   elevationChart:  $('elevation-chart'),
+  btnResetZoom:    $('btn-reset-zoom'),
   gearStatsContainer: $('gear-stats-container'),
   gearStats:       $('gear-stats'),
   hoverInfo:       $('hover-info'),
@@ -167,6 +168,13 @@ async function init() {
   // Event listeners
   els.btnBack.addEventListener('click', () => showScreen('activities'));
   els.btnLoadMore.addEventListener('click', () => loadActivities());
+
+  els.btnResetZoom.addEventListener('click', () => {
+    if (state.chart) {
+      state.chart.resetZoom();
+      els.btnResetZoom.classList.add('hidden');
+    }
+  });
   els.btnUploadFit.addEventListener('click', () => els.fitFileInput.click());
   els.fitFileInput.addEventListener('change', handleFitUploadFromList);
   els.btnUploadFitDetail.addEventListener('click', () => els.fitFileInputDetail.click());
@@ -852,6 +860,9 @@ function updateElevationChart() {
     state.chart.destroy();
   }
 
+  // Reset zoom button when chart is rebuilt
+  els.btnResetZoom.classList.add('hidden');
+
   const ctx = els.elevationChart.getContext('2d');
   const distances = streams.distance.map(d => distFromMetres(d).toFixed(2));
   const elevations = streams.altitude.map(a => elevFromMetres(a));
@@ -973,7 +984,28 @@ function updateElevationChart() {
       events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
       plugins: {
         legend: { display: false },
-        tooltip: { enabled: false }
+        tooltip: { enabled: false },
+        zoom: {
+          pan: {
+            enabled: true,
+            mode: 'x',
+            modifierKey: null
+          },
+          zoom: {
+            wheel: { enabled: true, speed: 0.05 },
+            pinch: { enabled: true },
+            drag: {
+              enabled: false
+            },
+            mode: 'x',
+            onZoomComplete: () => {
+              els.btnResetZoom.classList.remove('hidden');
+            }
+          },
+          limits: {
+            x: { minRange: 10 }
+          }
+        }
       },
       scales: {
         x: {
