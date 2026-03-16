@@ -210,6 +210,39 @@ a:hover { color: var(--accent-hover); }
 
 .feature-icon { font-size: 1.2rem; }
 
+.login-privacy-note {
+  max-width: 520px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.login-privacy-note h4 {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.login-privacy-note p {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+}
+
+.login-privacy-note p:last-child {
+  margin-bottom: 0;
+}
+
+.login-privacy-note a {
+  color: var(--accent, #3b82f6);
+  text-decoration: underline;
+}
+
 /* ─── Activities List ────────────────────────────────────────────── */
 .activities-header {
   display: flex;
@@ -1095,6 +1128,32 @@ a:hover { color: var(--accent-hover); }
   font-size: 0.78rem;
   color: var(--text-muted);
   margin-top: 8px;
+}
+
+.ai-progress {
+  margin: 16px auto 0;
+  max-width: 340px;
+}
+
+.ai-progress-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.ai-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+.ai-progress-text {
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 .ai-rating {

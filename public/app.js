@@ -150,6 +150,9 @@ const els = {
   aiAnalysisModal: $('ai-analysis-modal'),
   btnCloseAiAnalysis: $('btn-close-ai-analysis'),
   aiAnalysisLoading: $('ai-analysis-loading'),
+  aiProgress:        $('ai-progress'),
+  aiProgressFill:    $('ai-progress-fill'),
+  aiProgressText:    $('ai-progress-text'),
   aiAnalysisResults: $('ai-analysis-results'),
   aiScoreChart:    $('ai-score-chart'),
   aiScoreCanvas:   $('ai-score-canvas'),
@@ -1395,8 +1398,27 @@ async function runAiAnalysis(count = 10) {
   const loadingSpan = els.aiAnalysisLoading.querySelector('span');
   if (loadingSpan) loadingSpan.textContent = `Analysing your last ${count} ride${count > 1 ? 's' : ''}...`;
 
-  try {
-    const result = await api(`/api/ai-analysis?count=${encodeURIComponent(count)}`);
+  // Reset and show progress bar
+  els.aiProgress.classList.remove('hidden');
+  els.aiProgressFill.style.width = '0%';
+  els.aiProgressText.textContent = 'Fetching activity list...';
+
+  const evtSource = new EventSource(`/api/ai-analysis?count=${encodeURIComponent(count)}`);
+
+  evtSource.addEventListener('progress', (e) => {
+    const data = JSON.parse(e.data);
+    const pct = data.total > 0 ? (data.downloaded / data.total) * 100 : 0;
+    els.aiProgressFill.style.width = `${pct}%`;
+    if (data.phase) {
+      els.aiProgressText.textContent = data.phase;
+    } else {
+      els.aiProgressText.textContent = `Downloaded ${data.downloaded} of ${data.total}${data.ride ? ' — ' + data.ride : ''}`;
+    }
+  });
+
+  evtSource.addEventListener('result', (e) => {
+    evtSource.close();
+    const result = JSON.parse(e.data);
 
     if (result.error) {
       els.aiAnalysisLoading.classList.add('hidden');
@@ -1407,70 +1429,82 @@ async function runAiAnalysis(count = 10) {
 
     els.aiAnalysisLoading.classList.add('hidden');
     els.aiAnalysisResults.classList.remove('hidden');
+    displayAiResults(result);
+  });
 
-    // Rating display
-    const stars = '★'.repeat(result.rating) + '☆'.repeat(5 - result.rating);
-    els.aiRating.innerHTML = `
-      <div class="ai-rating-stars">${stars}</div>
-      <div class="ai-rating-label">${result.rating}/5 — Overall Shifting Score</div>
-      <div class="ai-rating-percent">${result.overallPercent}% efficiency across ${result.analysedCount} ride${result.analysedCount > 1 ? 's' : ''}</div>
-    `;
-
-    // Component bars
-    const comps = result.components;
-    els.aiComponents.innerHTML = `
-      <div class="ai-comp">
-        <span class="ai-comp-label">Cadence Efficiency</span>
-        <div class="ai-comp-bar"><div class="ai-comp-fill" style="width:${comps.cadence}%; background: #22c55e"></div></div>
-        <span class="ai-comp-pct">${comps.cadence}%</span>
-      </div>
-      <div class="ai-comp">
-        <span class="ai-comp-label">Cross-Chain Avoidance</span>
-        <div class="ai-comp-bar"><div class="ai-comp-fill" style="width:${comps.crossChain}%; background: #3b82f6"></div></div>
-        <span class="ai-comp-pct">${comps.crossChain}%</span>
-      </div>
-      <div class="ai-comp">
-        <span class="ai-comp-label">Gradient Matching</span>
-        <div class="ai-comp-bar"><div class="ai-comp-fill" style="width:${comps.gradient}%; background: #f59e0b"></div></div>
-        <span class="ai-comp-pct">${comps.gradient}%</span>
-      </div>
-      <div class="ai-comp">
-        <span class="ai-comp-label">Shift Smoothness</span>
-        <div class="ai-comp-bar"><div class="ai-comp-fill" style="width:${comps.hunting}%; background: #8b5cf6"></div></div>
-        <span class="ai-comp-pct">${comps.hunting}%</span>
-      </div>
-    `;
-
-    // Summary text
-    els.aiSummary.textContent = result.summary;
-
-    // Score-over-time chart
-    renderAiScoreChart(result.activities);
-
-    // Per-activity breakdown
-    if (result.activities?.length) {
-      els.aiActivities.innerHTML = `
-        <h4>Per-Ride Breakdown</h4>
-        <table class="ai-activities-table">
-          <thead><tr><th>Ride</th><th>Date</th><th>Score</th></tr></thead>
-          <tbody>
-            ${result.activities.map(a => `
-              <tr>
-                <td>${escapeHtml(a.name)}</td>
-                <td>${new Date(a.date).toLocaleDateString('en-GB', { day:'numeric', month:'short' })}</td>
-                <td>${'★'.repeat(a.rating)}${'☆'.repeat(5 - a.rating)} (${a.overall}%)</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
-    }
-
-  } catch (err) {
-    console.error('AI Analysis failed:', err);
+  evtSource.addEventListener('error_event', (e) => {
+    evtSource.close();
+    const data = JSON.parse(e.data);
     els.aiAnalysisLoading.classList.add('hidden');
     els.aiAnalysisError.classList.remove('hidden');
-    els.aiErrorText.textContent = 'Failed to run analysis. Check console for details.';
+    els.aiErrorText.textContent = data.error || 'Failed to run analysis.';
+  });
+
+  evtSource.onerror = () => {
+    evtSource.close();
+    els.aiAnalysisLoading.classList.add('hidden');
+    els.aiAnalysisError.classList.remove('hidden');
+    els.aiErrorText.textContent = 'Connection lost. Please try again.';
+  };
+}
+
+function displayAiResults(result) {
+  // Rating display
+  const stars = '★'.repeat(result.rating) + '☆'.repeat(5 - result.rating);
+  els.aiRating.innerHTML = `
+    <div class="ai-rating-stars">${stars}</div>
+    <div class="ai-rating-label">${result.rating}/5 — Overall Shifting Score</div>
+    <div class="ai-rating-percent">${result.overallPercent}% efficiency across ${result.analysedCount} ride${result.analysedCount > 1 ? 's' : ''}</div>
+  `;
+
+  // Component bars
+  const comps = result.components;
+  els.aiComponents.innerHTML = `
+    <div class="ai-comp">
+      <span class="ai-comp-label">Cadence Efficiency</span>
+      <div class="ai-comp-bar"><div class="ai-comp-fill" style="width:${comps.cadence}%; background: #22c55e"></div></div>
+      <span class="ai-comp-pct">${comps.cadence}%</span>
+    </div>
+    <div class="ai-comp">
+      <span class="ai-comp-label">Cross-Chain Avoidance</span>
+      <div class="ai-comp-bar"><div class="ai-comp-fill" style="width:${comps.crossChain}%; background: #3b82f6"></div></div>
+      <span class="ai-comp-pct">${comps.crossChain}%</span>
+    </div>
+    <div class="ai-comp">
+      <span class="ai-comp-label">Gradient Matching</span>
+      <div class="ai-comp-bar"><div class="ai-comp-fill" style="width:${comps.gradient}%; background: #f59e0b"></div></div>
+      <span class="ai-comp-pct">${comps.gradient}%</span>
+    </div>
+    <div class="ai-comp">
+      <span class="ai-comp-label">Shift Smoothness</span>
+      <div class="ai-comp-bar"><div class="ai-comp-fill" style="width:${comps.hunting}%; background: #8b5cf6"></div></div>
+      <span class="ai-comp-pct">${comps.hunting}%</span>
+    </div>
+  `;
+
+  // Summary text
+  els.aiSummary.textContent = result.summary;
+
+  // Score-over-time chart
+  renderAiScoreChart(result.activities);
+
+  // Per-activity breakdown
+  if (result.activities?.length) {
+    els.aiActivities.innerHTML = `
+      <h4>Per-Ride Breakdown</h4>
+      <table class="ai-activities-table">
+        <thead><tr><th>Ride</th><th>Date</th><th>Score</th></tr></thead>
+        <tbody>
+          ${result.activities.map(a => `
+            <tr>
+              <td>${escapeHtml(a.name)}</td>
+              <td>${new Date(a.date).toLocaleDateString('en-GB', { day:'numeric', month:'short' })}</td>
+              <td>${'★'.repeat(a.rating)}${'☆'.repeat(5 - a.rating)} (${a.overall}%)</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
   }
 }
 

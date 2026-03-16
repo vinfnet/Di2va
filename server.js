@@ -813,11 +813,24 @@ app.get('/api/ai-analysis', async (req, res) => {
   const token = await ensureValidToken(req);
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
 
+  // Use SSE to stream progress updates
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+
+  const sendEvent = (event, data) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
   try {
     const apiClient = stravaApi(token);
 
     // Use requested count (clamped 1–200) or default to 10
     const requestedCount = Math.max(1, Math.min(200, parseInt(req.query.count) || 10));
+
+    sendEvent('progress', { downloaded: 0, total: requestedCount, phase: 'Fetching activity list...' });
 
     // Fetch activities — may need multiple pages
     let allRides = [];
@@ -836,16 +849,23 @@ app.get('/api/ai-analysis', async (req, res) => {
     const rides = allRides.slice(0, requestedCount);
 
     if (rides.length === 0) {
-      return res.json({ error: 'No rides found' });
+      sendEvent('result', { error: 'No rides found' });
+      res.end();
+      return;
     }
 
-    console.log(`🤖 AI Analysis: processing ${rides.length} rides...`);
+    const totalRides = rides.length;
+    console.log(`🤖 AI Analysis: processing ${totalRides} rides...`);
 
     const activityResults = [];
     let aggregateScores = { cadence: 0, crossChain: 0, gradient: 0, hunting: 0 };
     let analysedCount = 0;
+    let processedCount = 0;
 
     for (const ride of rides) {
+      processedCount++;
+      sendEvent('progress', { downloaded: processedCount, total: totalRides, ride: ride.name });
+
       try {
         // Fetch streams
         const streamTypes = 'time,latlng,altitude,distance,cadence,watts,grade_smooth,velocity_smooth';
@@ -903,7 +923,9 @@ app.get('/api/ai-analysis', async (req, res) => {
     }
 
     if (analysedCount === 0) {
-      return res.json({ error: 'No rides with sufficient data for analysis' });
+      sendEvent('result', { error: 'No rides with sufficient data for analysis' });
+      res.end();
+      return;
     }
 
     // Average scores
@@ -966,7 +988,7 @@ app.get('/api/ai-analysis', async (req, res) => {
 
     console.log(`🤖 AI Analysis complete: ${overallRating}/5 across ${analysedCount} rides`);
 
-    res.json({
+    sendEvent('result', {
       rating: overallRating,
       overallPercent: overallPct.toFixed(0),
       summary,
@@ -979,10 +1001,12 @@ app.get('/api/ai-analysis', async (req, res) => {
       activities: activityResults,
       analysedCount
     });
+    res.end();
 
   } catch (err) {
     console.error('AI Analysis error:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Failed to run analysis' });
+    sendEvent('error_event', { error: 'Failed to run analysis' });
+    res.end();
   }
 });
 

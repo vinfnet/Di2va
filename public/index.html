@@ -84,6 +84,11 @@
           </svg>
           Connect with Strava
         </a>
+        <div class="login-privacy-note">
+          <h4>🔒 Why do I need to log in?</h4>
+          <p>Di2va needs read-only access to your Strava activities to fetch ride data, GPS streams, cadence, and power — the inputs it uses to analyse your shifting. <strong>All processing happens entirely on your own computer.</strong> Your .FIT files are parsed locally, nothing is sent to any third-party service, and your Strava credentials never leave your machine.</p>
+          <p>For full details on how your data is handled, see the <a href="docs/SETUP_GUIDE.md" target="_blank">Setup Guide — Data Processing &amp; Privacy</a>.</p>
+        </div>
       </div>
     </section>
 
@@ -318,6 +323,10 @@
         <div id="ai-analysis-loading" class="ai-loading">
           <div class="spinner"></div>
           <span>Analysing your last 10 rides...</span>
+          <div id="ai-progress" class="ai-progress hidden">
+            <div class="ai-progress-bar"><div id="ai-progress-fill" class="ai-progress-fill"></div></div>
+            <span id="ai-progress-text" class="ai-progress-text">Downloaded 0 of 0</span>
+          </div>
           <p class="ai-loading-hint">This fetches data from Strava for each ride — it may take a moment.</p>
         </div>
         <div id="ai-analysis-results" class="hidden">
