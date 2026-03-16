@@ -1179,6 +1179,13 @@ a:hover { color: var(--accent-hover); }
   margin-top: 2px;
 }
 
+.ai-score-hint {
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
 .ai-components {
   display: grid;
   gap: 10px;
