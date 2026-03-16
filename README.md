@@ -129,6 +129,10 @@ Uses `nodemon` for auto-restart on file changes.
 
 The browser extension injects Di2va directly into Strava activity pages — no separate web app, no OAuth setup. It uses your existing Strava session to fetch streams and FIT data.
 
+![Di2va browser extension on a Strava activity page](docs/screenshots/di2va-browser-extension.png)
+
+*Di2va browser extension injected on a Strava activity page — shifting quality score, gear usage cards, gear-colored elevation profile with drag-to-zoom, animated drivetrain replay with real-time shifting analysis.*
+
 > **⚠️ This is under active development.** It works but may have rough edges. Feedback welcome.
 >
 > **Tested with Firefox** so far. Chrome support is built in (MV3 manifest) but has not been extensively tested yet.
