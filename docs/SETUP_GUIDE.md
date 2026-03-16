@@ -1,5 +1,94 @@
 # Di2va — Setup Guide
 
+Di2va comes in two forms: a **standalone web app** and a **browser extension** (in development). Choose the one that suits you:
+
+| | Standalone Web App | Browser Extension |
+|---|---|---|
+| **Setup effort** | Requires Strava API credentials | Just build and load — no API keys |
+| **Where it runs** | `localhost:3000` in a separate tab | Injected directly into Strava activity pages |
+| **Status** | ✅ Stable | 🚧 In development |
+
+---
+
+## Option A: Browser Extension *(Recommended for trying out)*
+
+The browser extension is the easiest way to use Di2va — no Strava API application needed. It runs directly on Strava activity pages using your existing login session.
+
+> **Tested with Firefox** so far. Chrome support is built in (MV3 manifest) but has not been extensively tested yet.
+>
+> Inspired by [Sauce for Strava](https://www.sauce.llc/) — an excellent browser extension that enhances Strava with advanced analytics. Di2va takes a similar approach but focuses specifically on Di2 electronic gear shift data.
+
+### Prerequisites
+
+- **Node.js 18+** and npm (for building)
+- **Chrome** or **Firefox**
+- Be logged into **Strava** in your browser
+
+### Step 1 — Build the Extension
+
+```bash
+git clone https://github.com/vinfnet/Di2va.git
+cd Di2va/extension
+npm install
+npm run build
+```
+
+This creates the built extension in `extension/dist/`.
+
+### Step 2 — Load in Your Browser
+
+#### Chrome
+
+1. Open `chrome://extensions/`
+2. Enable **Developer mode** (top-right toggle)
+3. Click **Load unpacked**
+4. Select the `extension/dist/` folder
+5. You should see "Di2va — Shimano Di2 Gear Overlay for Strava" in your extensions list
+
+#### Firefox
+
+1. Open `about:debugging#/runtime/this-firefox`
+2. Click **Load Temporary Add-on…**
+3. Navigate to the `extension/dist/` folder and select `manifest.json`
+4. You should see "Di2va" listed under Temporary Extensions
+
+> **Note:** Firefox temporary add-ons are removed when the browser closes. You'll need to re-load the extension each time you restart Firefox.
+
+### Step 3 — Use It
+
+1. Navigate to any Strava activity page (e.g. `https://www.strava.com/activities/12345`)
+2. A collapsible **Di2va** panel appears below the Strava map
+3. Click the panel header to expand it
+4. The extension automatically fetches stream data and attempts to download the FIT file for actual Di2 gear shifts
+5. If no FIT file is available, gears are estimated from cadence + speed
+
+### What You'll See
+
+- **Gear-colored elevation profile** — drag to zoom into sections
+- **Shifting quality scores** — overall rating and per-component breakdown
+- **Gear usage statistics** — time in each gear combination
+- **Animated drivetrain replay** — press Play to watch your ride with real-time shifting analysis
+- **Section scores** — zoom into any section for detailed analysis
+
+### Rebuilding After Changes
+
+If you make changes to the extension source code:
+
+```bash
+cd extension
+npm run build
+```
+
+Then reload the extension in your browser:
+- **Chrome**: Click the reload icon on the extension card in `chrome://extensions/`
+- **Firefox**: Click **Reload** next to the extension in `about:debugging`
+
+---
+
+## Option B: Standalone Web App
+
+> The standalone web app provides a full activity browser with map overlay, but requires setting up Strava API credentials.
+
 ## Why Di2va?
 
 I'm a keen cyclist — nothing serious, very much an amateur — but I find the tech side of riding genuinely interesting. I run a Shimano Di2 electronic groupset and was increasingly frustrated that **Strava still does not include Di2 electronic shifter data in its ride analysis**. The gear data is right there in the FIT file uploaded by my bike computer, but Strava just ignores it.

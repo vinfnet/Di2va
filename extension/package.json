@@ -1,0 +1,20 @@
+{
+  "name": "di2va-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Di2va browser extension — Shimano Di2 gear overlay for Strava",
+  "scripts": {
+    "build": "webpack --mode production",
+    "build:dev": "webpack --mode development",
+    "watch": "webpack --mode development --watch"
+  },
+  "devDependencies": {
+    "copy-webpack-plugin": "^12.0.2",
+    "webpack": "^5.97.0",
+    "webpack-cli": "^6.0.0"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.0",
+    "fit-file-parser": "^1.9.0"
+  }
+}

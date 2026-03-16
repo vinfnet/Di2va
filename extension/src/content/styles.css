@@ -1,0 +1,904 @@
+/*
+ * Di2va — Content Script Styles
+ * Injected alongside main.js on Strava activity pages.
+ * Designed to match Strava's native styling.
+ */
+
+/* ─── Panel Container ────────────────────────────────────────────── */
+
+#di2va-panel {
+  margin: 12px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  color: #333;
+  overflow: hidden;
+}
+
+/* Dark mode (Sauce for Strava compatible) */
+.sauce-theme-dark #di2va-panel,
+[data-theme="dark"] #di2va-panel {
+  background: #1a1a2e;
+  border-color: #333;
+  color: #e0e0e0;
+}
+
+/* ─── Header / Toggle ────────────────────────────────────────────── */
+
+.di2va-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: #f7f7fa;
+  border-bottom: 1px solid #eee;
+}
+
+.sauce-theme-dark .di2va-header,
+[data-theme="dark"] .di2va-header {
+  background: #16213e;
+  border-bottom-color: #333;
+}
+
+.di2va-header:hover {
+  background: #efefef;
+}
+
+.sauce-theme-dark .di2va-header:hover,
+[data-theme="dark"] .di2va-header:hover {
+  background: #1a1a3a;
+}
+
+.di2va-logo {
+  font-weight: 700;
+  font-size: 14px;
+  color: #fc4c02;
+}
+
+.di2va-status {
+  flex: 1;
+  text-align: right;
+  font-size: 11px;
+  color: #888;
+}
+
+.di2va-chevron {
+  font-size: 16px;
+  color: #888;
+  transition: transform 0.2s;
+}
+
+.di2va-collapsed .di2va-chevron {
+  transform: rotate(-90deg);
+}
+
+.di2va-collapsed .di2va-body {
+  display: none;
+}
+
+/* ─── Body ───────────────────────────────────────────────────────── */
+
+.di2va-body {
+  padding: 12px;
+}
+
+.di2va-body.di2va-drag-over {
+  background: rgba(252, 76, 2, 0.05);
+  outline: 2px dashed #fc4c02;
+  outline-offset: -4px;
+}
+
+/* ─── Loading ────────────────────────────────────────────────────── */
+
+.di2va-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0;
+  color: #888;
+  font-size: 12px;
+}
+
+.di2va-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #ddd;
+  border-top-color: #fc4c02;
+  border-radius: 50%;
+  animation: di2va-spin 0.8s linear infinite;
+}
+
+@keyframes di2va-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Error ──────────────────────────────────────────────────────── */
+
+.di2va-error {
+  padding: 10px;
+  border-radius: 4px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 12px;
+  border: 1px solid #fecaca;
+}
+
+.sauce-theme-dark .di2va-error,
+[data-theme="dark"] .di2va-error {
+  background: #2d1b1b;
+  color: #f87171;
+  border-color: #5c1d1d;
+}
+
+/* ─── Sections ───────────────────────────────────────────────────── */
+
+.di2va-section {
+  margin-bottom: 12px;
+}
+
+.di2va-section:last-child {
+  margin-bottom: 0;
+}
+
+/* ─── Row / Column Layout ────────────────────────────────────────── */
+
+.di2va-row {
+  display: flex;
+  gap: 20px;
+}
+
+.di2va-col {
+  min-width: 0;
+}
+
+.di2va-col-score {
+  flex: 0 0 260px;
+}
+
+.di2va-col-gears {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 640px) {
+  .di2va-row {
+    flex-direction: column;
+  }
+  .di2va-col-score {
+    flex: none;
+  }
+}
+
+/* ─── Source Info ─────────────────────────────────────────────────── */
+
+.di2va-source {
+  font-size: 11px;
+  color: #888;
+}
+
+/* ─── Score ───────────────────────────────────────────────────────── */
+
+.di2va-score-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.di2va-stars {
+  font-size: 22px;
+  color: #f59e0b;
+  letter-spacing: 2px;
+}
+
+.di2va-overall {
+  font-size: 28px;
+  font-weight: 700;
+  color: #333;
+}
+
+.sauce-theme-dark .di2va-overall,
+[data-theme="dark"] .di2va-overall {
+  color: #e0e0e0;
+}
+
+/* ─── Score Components ───────────────────────────────────────────── */
+
+.di2va-components {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.di2va-component {
+  display: grid;
+  grid-template-columns: 120px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+}
+
+.di2va-component-label {
+  font-size: 11px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sauce-theme-dark .di2va-component-label,
+[data-theme="dark"] .di2va-component-label {
+  color: #aaa;
+}
+
+.di2va-bar-track {
+  height: 6px;
+  background: #eee;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.sauce-theme-dark .di2va-bar-track,
+[data-theme="dark"] .di2va-bar-track {
+  background: #333;
+}
+
+.di2va-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.di2va-component-value {
+  font-size: 11px;
+  font-weight: 600;
+  text-align: right;
+  color: #333;
+}
+
+.sauce-theme-dark .di2va-component-value,
+[data-theme="dark"] .di2va-component-value {
+  color: #e0e0e0;
+}
+
+/* ─── Gear Stats ─────────────────────────────────────────────────── */
+
+.di2va-stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.di2va-shift-count {
+  font-weight: 400;
+  font-size: 11px;
+  color: #888;
+}
+
+.di2va-gear-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+@media (max-width: 640px) {
+  .di2va-gear-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.di2va-gear-card {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px;
+  background: #fafafa;
+  border-radius: 3px;
+}
+
+.sauce-theme-dark .di2va-gear-card,
+[data-theme="dark"] .di2va-gear-card {
+  background: #1e1e3a;
+}
+
+.di2va-gear-name {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.di2va-gear-pct {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 3px;
+}
+
+.di2va-gear-bar {
+  height: 3px;
+  background: #eee;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sauce-theme-dark .di2va-gear-bar,
+[data-theme="dark"] .di2va-gear-bar {
+  background: #333;
+}
+
+.di2va-gear-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+
+/* ─── Legend ──────────────────────────────────────────────────────── */
+
+.di2va-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding-top: 4px;
+  border-top: 1px solid #eee;
+}
+
+.sauce-theme-dark .di2va-legend-row,
+[data-theme="dark"] .di2va-legend-row {
+  border-top-color: #333;
+}
+
+.di2va-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.di2va-legend-labels {
+  display: flex;
+  justify-content: space-between;
+  flex: 1;
+  font-size: 10px;
+  color: #aaa;
+  margin-left: 4px;
+}
+
+/* ─── Elevation Chart ────────────────────────────────────────────── */
+
+.di2va-chart-section {
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.di2va-chart-row {
+  display: flex;
+  gap: 12px;
+}
+
+.di2va-chart-area {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 220px;
+  cursor: crosshair;
+}
+
+#di2va-elevation-chart {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.di2va-zoom-hint {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: #aaa;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.sauce-theme-dark .di2va-zoom-hint,
+[data-theme="dark"] .di2va-zoom-hint {
+  color: #666;
+}
+
+/* ─── Chart Sidebar ──────────────────────────────────────────────── */
+
+.di2va-chart-sidebar {
+  flex: 0 0 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* ─── Hover Info Box (in sidebar) ────────────────────────────────── */
+
+.di2va-hover-info {
+  padding: 8px 10px;
+  background: #f7f7fa;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.sauce-theme-dark .di2va-hover-info,
+[data-theme="dark"] .di2va-hover-info {
+  background: #16213e;
+  border-color: #333;
+  color: #e0e0e0;
+}
+
+.di2va-hv-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 1px 0;
+}
+
+.di2va-hv-title {
+  font-weight: 700;
+  font-size: 12px;
+  margin-bottom: 4px;
+  color: #333;
+}
+
+.sauce-theme-dark .di2va-hv-title,
+[data-theme="dark"] .di2va-hv-title {
+  color: #e0e0e0;
+}
+
+.di2va-hv-label {
+  color: #888;
+}
+
+.di2va-hv-value {
+  font-weight: 600;
+  color: #333;
+}
+
+.sauce-theme-dark .di2va-hv-value,
+[data-theme="dark"] .di2va-hv-value {
+  color: #e0e0e0;
+}
+
+/* ─── Section Scores (shown on zoom) ─────────────────────────────── */
+
+.di2va-section-scores {
+  padding: 8px 10px;
+  background: #f7f7fa;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.sauce-theme-dark .di2va-section-scores,
+[data-theme="dark"] .di2va-section-scores {
+  background: #16213e;
+  border-color: #333;
+  color: #e0e0e0;
+}
+
+.di2va-ss-title {
+  font-weight: 700;
+  font-size: 11px;
+  margin-bottom: 4px;
+  color: #333;
+}
+
+.sauce-theme-dark .di2va-ss-title,
+[data-theme="dark"] .di2va-ss-title {
+  color: #e0e0e0;
+}
+
+.di2va-ss-range {
+  font-size: 10px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.di2va-ss-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.di2va-ss-row:last-child {
+  margin-bottom: 0;
+}
+
+.di2va-ss-label {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: #666;
+  white-space: nowrap;
+  max-width: 65px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sauce-theme-dark .di2va-ss-label,
+[data-theme="dark"] .di2va-ss-label {
+  color: #aaa;
+}
+
+.di2va-ss-bar-track {
+  flex: 1 1 auto;
+  height: 5px;
+  background: #eee;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.sauce-theme-dark .di2va-ss-bar-track,
+[data-theme="dark"] .di2va-ss-bar-track {
+  background: #333;
+}
+
+.di2va-ss-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.di2va-ss-value {
+  flex: 0 0 28px;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: right;
+  color: #333;
+}
+
+.sauce-theme-dark .di2va-ss-value,
+[data-theme="dark"] .di2va-ss-value {
+  color: #e0e0e0;
+}
+
+/* ─── Reset Zoom Button ──────────────────────────────────────────── */
+
+.di2va-zoom-reset {
+  padding: 5px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  color: #333;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.di2va-zoom-reset:hover {
+  background: #f0f0f0;
+  border-color: #fc4c02;
+  color: #fc4c02;
+}
+
+.sauce-theme-dark .di2va-zoom-reset,
+[data-theme="dark"] .di2va-zoom-reset {
+  background: #1e1e3a;
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+.sauce-theme-dark .di2va-zoom-reset:hover,
+[data-theme="dark"] .di2va-zoom-reset:hover {
+  background: #2a2a4a;
+  border-color: #fc4c02;
+  color: #fc4c02;
+}
+
+@media (max-width: 640px) {
+  .di2va-chart-row {
+    flex-direction: column;
+  }
+  .di2va-chart-area {
+    height: 180px;
+  }
+  .di2va-chart-sidebar {
+    flex: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .di2va-chart-sidebar > * {
+    flex: 1 1 140px;
+  }
+}
+
+/* ─── Ride Replay / Drivetrain ───────────────────────────────────── */
+
+.di2va-replay-section {
+  border-top: 1px solid #eee;
+  padding-top: 12px;
+}
+
+.sauce-theme-dark .di2va-replay-section,
+[data-theme="dark"] .di2va-replay-section {
+  border-top-color: #333;
+}
+
+/* Controls bar — play, speed, time on one line above animation */
+.di2va-replay-controls-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+/* Body — drivetrain left, AI box right */
+.di2va-replay-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.di2va-replay-left {
+  flex: 0 0 340px;
+  min-width: 0;
+}
+
+.di2va-replay-right {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.di2va-drivetrain {
+  width: 100%;
+  min-height: 180px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #2a2a2a;
+  position: relative;
+}
+
+.di2va-dt-inactive svg {
+  filter: grayscale(1) brightness(0.5);
+}
+
+.di2va-dt-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #aaa;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ─── AI Analysis Box ────────────────────────────────────────────── */
+
+.di2va-replay-ai {
+  padding: 10px 12px;
+  background: #f7f7fa;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.sauce-theme-dark .di2va-replay-ai,
+[data-theme="dark"] .di2va-replay-ai {
+  background: #16213e;
+  border-color: #333;
+  color: #e0e0e0;
+}
+
+.di2va-ai-title {
+  font-weight: 700;
+  font-size: 12px;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.sauce-theme-dark .di2va-ai-title,
+[data-theme="dark"] .di2va-ai-title {
+  color: #e0e0e0;
+}
+
+.di2va-ai-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.di2va-ai-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.di2va-ai-tick {
+  color: #22c55e;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.di2va-ai-cross {
+  color: #ef4444;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.di2va-ai-info {
+  color: #888;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.di2va-ai-suggestion {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #eee;
+  font-size: 11px;
+  color: #666;
+}
+
+.sauce-theme-dark .di2va-ai-suggestion,
+[data-theme="dark"] .di2va-ai-suggestion {
+  border-top-color: #333;
+  color: #aaa;
+}
+
+.di2va-ai-suggest {
+  color: #fc4c02;
+  font-weight: 600;
+}
+
+.di2va-ai-ok {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+/* ─── Playback Controls ──────────────────────────────────────────── */
+
+.di2va-play-btn {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 4px;
+  background: #fc4c02;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.di2va-play-btn:hover {
+  background: #e04400;
+}
+
+.di2va-speed-group {
+  display: flex;
+  gap: 2px;
+}
+
+.di2va-speed-btn {
+  padding: 3px 8px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  background: #fff;
+  color: #666;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.di2va-speed-btn.active {
+  background: #fc4c02;
+  color: #fff;
+  border-color: #fc4c02;
+}
+
+.di2va-speed-btn:hover:not(.active) {
+  border-color: #fc4c02;
+  color: #fc4c02;
+}
+
+.sauce-theme-dark .di2va-speed-btn,
+[data-theme="dark"] .di2va-speed-btn {
+  background: #1e1e3a;
+  border-color: #444;
+  color: #aaa;
+}
+
+.sauce-theme-dark .di2va-speed-btn.active,
+[data-theme="dark"] .di2va-speed-btn.active {
+  background: #fc4c02;
+  color: #fff;
+  border-color: #fc4c02;
+}
+
+/* ─── Scrubber / Progress ────────────────────────────────────────── */
+
+.di2va-replay-progress {
+  margin-bottom: 8px;
+}
+
+.di2va-scrubber {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #ddd;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.di2va-scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fc4c02;
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.di2va-scrubber::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fc4c02;
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.sauce-theme-dark .di2va-scrubber,
+[data-theme="dark"] .di2va-scrubber {
+  background: #333;
+}
+
+.di2va-replay-time {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+/* ─── Replay Stats Row ───────────────────────────────────────────── */
+
+.di2va-replay-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 11px;
+  color: #666;
+  min-height: 18px;
+}
+
+.sauce-theme-dark .di2va-replay-stats,
+[data-theme="dark"] .di2va-replay-stats {
+  color: #aaa;
+}
+
+.di2va-rs-item {
+  white-space: nowrap;
+}
+
+/* ─── Responsive Replay ──────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .di2va-replay-body {
+    flex-direction: column;
+  }
+  .di2va-replay-left {
+    flex: none;
+    max-width: 100%;
+  }
+}

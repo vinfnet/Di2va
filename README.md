@@ -4,6 +4,15 @@
 
 **Visualize your Shimano Di2 electronic gear shift data from Strava cycling activities** — see exactly what gear you were in at every point on a map and elevation profile, with interactive gear statistics and a drivetrain visualization.
 
+Di2va comes in two forms:
+
+| | Standalone Web App | Browser Extension *(in development)* |
+|---|---|---|
+| **How it runs** | Local Node.js server at `localhost:3000` | Chrome/Firefox extension injected on Strava |
+| **Auth** | Strava OAuth (Client ID + Secret) | Uses your existing Strava session — no API keys needed |
+| **FIT data** | Upload, auto-download, or FIT library folder | Auto-downloads from Strava using session cookies |
+| **Status** | ✅ Stable | 🚧 In development — [try it out](#browser-extension-in-development) |
+
 ![screenshot](https://img.shields.io/badge/status-development-orange)
 
 ![Di2va ride overview](docs/screenshots/di2va-ride-overview.png)
@@ -30,6 +39,8 @@ I was inspired by **[Di2Stats.com](https://di2stats.com)** — a great service t
 
 ## Features
 
+### Standalone Web App
+
 - **Strava OAuth** — Securely connect your Strava account (credentials stored locally, never committed)
 - **Activity Browser** — Browse your rides, filtered to cycling only
 - **Map Overlay** — Route colored by gear selection (front/rear combo)
@@ -45,6 +56,21 @@ I was inspired by **[Di2Stats.com](https://di2stats.com)** — a great service t
 - **AI Shifting Analysis** — Scores your shifting across your last 10 rides on cadence efficiency, gradient matching, cross-chain avoidance, and shift smoothness ([details](docs/AI_ANALYSIS.md))
 - **Optimal Gear Overlay** — Toggle a dashed gold line on the elevation chart showing the recommended gear ratio at each point
 - **Units Switcher** — Toggle between metric and imperial
+
+### Browser Extension *(in development)*
+
+All of the above analysis integrated directly into Strava activity pages, plus:
+
+- **No OAuth setup** — Uses your existing Strava browser session (no API keys needed)
+- **Elevation Chart with Gear-Colored Segments** — Full-width elevation profile below the Strava map, color-coded by gear
+- **Drag-to-Zoom** — Select a section of the elevation chart to zoom in with section scores
+- **Animated Drivetrain Replay** — SVG transmission animation plays back your ride with cadence-driven crank rotation
+- **Real-Time Shifting Analysis** — Live tick/cross feedback on cadence efficiency, cross-chain avoidance, and gradient matching as playback progresses
+- **Coasting & Stopped Detection** — Distinguishes between pedalling, coasting, and stopped states
+- **Playback Controls** — Play/pause, speed (1×–20×), scrubber, and time display
+- **Dark Mode** — Automatic detection of Strava/Sauce dark themes
+- **Unit Detection** — Reads your Strava unit preferences (metric/imperial)
+- **Chrome & Firefox** — MV3 WebExtension compatible with both browsers
 
 ## Data Privacy
 
@@ -99,6 +125,83 @@ npm run dev
 
 Uses `nodemon` for auto-restart on file changes.
 
+## Browser Extension *(In Development)*
+
+The browser extension injects Di2va directly into Strava activity pages — no separate web app, no OAuth setup. It uses your existing Strava session to fetch streams and FIT data.
+
+> **⚠️ This is under active development.** It works but may have rough edges. Feedback welcome.
+>
+> **Tested with Firefox** so far. Chrome support is built in (MV3 manifest) but has not been extensively tested yet.
+>
+> Inspired by [Sauce for Strava](https://www.sauce.llc/) — an excellent browser extension that enhances Strava with advanced analytics. Di2va takes a similar approach but focuses specifically on Di2 electronic gear shift data.
+
+### Try It Out
+
+**Prerequisites:** Node.js 18+ (for building), Chrome or Firefox
+
+```bash
+git clone https://github.com/vinfnet/Di2va.git
+cd Di2va/extension
+npm install
+npm run build
+```
+
+#### Chrome
+
+1. Open `chrome://extensions/`
+2. Enable **Developer mode** (top-right toggle)
+3. Click **Load unpacked**
+4. Select the `extension/dist/` folder
+5. Navigate to any Strava activity page — Di2va appears below the map
+
+#### Firefox
+
+1. Open `about:debugging#/runtime/this-firefox`
+2. Click **Load Temporary Add-on…**
+3. Select any file inside `extension/dist/` (e.g. `manifest.json`)
+4. Navigate to any Strava activity page — Di2va appears below the map
+
+> **Note:** Firefox temporary add-ons are removed when Firefox closes. For persistent installation, the extension would need to be signed via [addons.mozilla.org](https://addons.mozilla.org).
+
+### How It Works (Extension)
+
+- The content script runs on `https://www.strava.com/activities/*`
+- It extracts the activity ID from the URL and fetches stream data using Strava's internal API endpoints (authenticated via your session cookies)
+- It attempts to download the original FIT file from Strava's export endpoint for actual Di2 gear shift data
+- If no FIT file is available, gears are estimated from cadence + speed
+- A collapsible panel is injected below the Strava map with the elevation chart, gear analysis, drivetrain animation, and shifting analysis
+
+### Extension Architecture
+
+```
+extension/
+├── manifest.json              # MV3 WebExtension manifest (Chrome + Firefox)
+├── webpack.config.js          # Webpack 5 build config
+├── src/
+│   ├── content/
+│   │   ├── main.js            # Content script entry — panel injection, data pipeline
+│   │   ├── elevation-chart.js # Chart.js elevation with gear colors, drag-to-zoom
+│   │   ├── playback.js        # Ride replay engine, drivetrain sync, AI analysis
+│   │   ├── drivetrain.js      # SVG drivetrain renderer (chainrings, cassette, chain)
+│   │   ├── units.js           # Strava unit detection (metric/imperial)
+│   │   └── styles.css         # Panel styles, dark mode support
+│   ├── gear-estimator.js      # Gear estimation from cadence + speed
+│   ├── gear-parser.js         # FIT file Di2 event parser
+│   ├── gear-colors.js         # Gear → color mapping
+│   ├── shift-analyzer.js      # Shifting quality analysis engine
+│   ├── fit-worker.js          # Web Worker for FIT parsing + decompression
+│   └── background.js          # Service worker (cookie forwarding)
+├── popup/                     # Extension popup UI
+├── options/                   # Extension options page
+└── dist/                      # Built output (load this in browser)
+```
+
+---
+
+## Standalone Web App
+
+> The standalone web app is the original Di2va interface. It requires Strava OAuth credentials but provides a full activity browser with map overlay.
+
 ## How It Works
 
 ### Data Sources
@@ -135,10 +238,15 @@ di2va/
 ├── .env                   # Environment variables (not in git)
 ├── .env.example           # Template for .env
 ├── package.json
-└── public/
-    ├── index.html         # Single-page app shell
-    ├── styles.css         # Dark theme UI
-    └── app.js             # Frontend: map, chart, gear logic
+├── public/
+│   ├── index.html         # Single-page app shell
+│   ├── styles.css         # Dark theme UI
+│   └── app.js             # Frontend: map, chart, gear logic
+└── extension/             # Browser extension (in development)
+    ├── manifest.json      # MV3 WebExtension manifest
+    ├── webpack.config.js  # Build config
+    ├── src/               # Source modules
+    └── dist/              # Built output (load in browser)
 ```
 
 ### Tech Stack

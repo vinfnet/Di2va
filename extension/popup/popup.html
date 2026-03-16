@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 280px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      color: #333;
+      background: #fff;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      background: #fc4c02;
+      color: white;
+    }
+
+    .header-logo {
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .header-version {
+      font-size: 10px;
+      opacity: 0.8;
+      margin-left: auto;
+    }
+
+    .content {
+      padding: 12px;
+    }
+
+    .no-data {
+      text-align: center;
+      color: #888;
+      padding: 20px 0;
+    }
+
+    .no-data p {
+      margin-bottom: 6px;
+    }
+
+    .activity-card {
+      border: 1px solid #eee;
+      border-radius: 4px;
+      padding: 10px;
+    }
+
+    .activity-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .activity-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .label {
+      font-size: 11px;
+      color: #888;
+    }
+
+    .value {
+      font-weight: 600;
+    }
+
+    .stars {
+      color: #f59e0b;
+      font-size: 16px;
+      letter-spacing: 1px;
+    }
+
+    .source-badge {
+      display: inline-block;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    .source-fit {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .source-estimated {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .footer {
+      padding: 8px 12px;
+      border-top: 1px solid #eee;
+      text-align: center;
+    }
+
+    .footer a {
+      font-size: 11px;
+      color: #fc4c02;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span class="header-logo">⛓ Di2va</span>
+    <span class="header-version">v0.1.0</span>
+  </div>
+
+  <div class="content" id="content">
+    <div class="no-data" id="no-data">
+      <p>🚲</p>
+      <p>Navigate to a Strava activity to see gear data</p>
+    </div>
+    <div class="activity-card" id="activity-card" style="display:none;">
+      <div class="activity-row">
+        <span class="label">Source</span>
+        <span id="source" class="source-badge"></span>
+      </div>
+      <div class="activity-row">
+        <span class="label">Rating</span>
+        <span id="rating" class="stars"></span>
+      </div>
+      <div class="activity-row">
+        <span class="label">Overall</span>
+        <span id="overall" class="value"></span>
+      </div>
+      <div class="activity-row">
+        <span class="label">Shifts</span>
+        <span id="shifts" class="value"></span>
+      </div>
+      <div class="activity-row">
+        <span class="label">Gears Used</span>
+        <span id="gears" class="value"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <a href="#" id="options-link">Settings</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

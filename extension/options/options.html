@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      color: #333;
+      background: #fff;
+      padding: 20px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin-bottom: 16px;
+      color: #fc4c02;
+    }
+
+    h2 {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 16px 0 8px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 4px;
+    }
+
+    .field {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    label {
+      flex: 0 0 140px;
+      font-size: 12px;
+      color: #666;
+    }
+
+    input[type="text"],
+    input[type="number"] {
+      flex: 1;
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: monospace;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #fc4c02;
+    }
+
+    .hint {
+      font-size: 10px;
+      color: #aaa;
+      margin-top: -6px;
+      margin-bottom: 10px;
+      padding-left: 150px;
+    }
+
+    button {
+      background: #fc4c02;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    button:hover {
+      background: #e54400;
+    }
+
+    .saved {
+      color: #22c55e;
+      font-size: 12px;
+      margin-left: 10px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .saved.visible {
+      opacity: 1;
+    }
+
+    .actions {
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>⛓ Di2va Settings</h1>
+
+  <h2>Drivetrain</h2>
+
+  <div class="field">
+    <label for="chainrings">Chainrings (teeth)</label>
+    <input type="text" id="chainrings" placeholder="34,50">
+  </div>
+  <div class="hint">Comma-separated. Example: 34,50 or 36,52</div>
+
+  <div class="field">
+    <label for="cassette">Cassette (teeth)</label>
+    <input type="text" id="cassette" placeholder="11,12,13,14,15,17,19,21,24,28">
+  </div>
+  <div class="hint">Comma-separated, smallest to largest</div>
+
+  <div class="field">
+    <label for="wheelCirc">Wheel circumference (m)</label>
+    <input type="number" id="wheelCirc" step="0.001" placeholder="2.105">
+  </div>
+  <div class="hint">700x25c ≈ 2.105m, 700x28c ≈ 2.136m</div>
+
+  <h2>Display</h2>
+
+  <div class="field">
+    <label for="autoExpand">Auto-expand panel</label>
+    <input type="checkbox" id="autoExpand">
+  </div>
+
+  <div class="actions">
+    <button id="save">Save</button>
+    <span class="saved" id="saved">Saved ✓</span>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
