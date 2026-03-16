@@ -1300,6 +1300,13 @@ function handleFullscreenChange() {
   if (state.chart) {
     setTimeout(() => state.chart.resize(), 100);
   }
+  // Show/hide fullscreen AI bar
+  const fsBar = document.getElementById('fullscreen-ai-bar');
+  if (fsBar) {
+    const isFs = document.fullscreenElement === els.elevContainer;
+    fsBar.classList.toggle('hidden', !isFs);
+    if (isFs) _syncFullscreenAI();
+  }
 }
 
 // ─── Point Highlighting (Syncs Map & Chart) ─────────────────────────────────
@@ -1349,6 +1356,7 @@ function highlightPoint(index) {
     _updateReplayDrivetrain(index);
     _updateReplayAI(index);
     _updatePowerBar(index);
+    _syncFullscreenAI();
   }
 }
 
@@ -2859,6 +2867,9 @@ function _updateReplayFrame() {
 
   // Power bar
   _updatePowerBar(i);
+
+  // Sync fullscreen AI if active
+  _syncFullscreenAI();
 }
 
 function _updateReplayRotation() {
@@ -2982,6 +2993,14 @@ function _fmtTime(sec) {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function _syncFullscreenAI() {
+  const fsContent = document.getElementById('fullscreen-ai-content');
+  const srcContent = document.getElementById('replay-ai-content');
+  if (fsContent && srcContent && document.fullscreenElement === els.elevContainer) {
+    fsContent.innerHTML = srcContent.innerHTML;
+  }
 }
 
 function _updatePowerBar(index) {
