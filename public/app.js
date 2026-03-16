@@ -141,10 +141,18 @@ const els = {
   unitsSelect:     $('units-select'),
   // AI Analysis
   btnAiAnalysis:   $('btn-ai-analysis'),
+  aiSliderModal:   $('ai-slider-modal'),
+  btnCloseAiSlider: $('btn-close-ai-slider'),
+  aiActivitySlider: $('ai-activity-slider'),
+  aiSliderValue:   $('ai-slider-value'),
+  aiSliderWarning: $('ai-slider-warning'),
+  btnRunAiAnalysis: $('btn-run-ai-analysis'),
   aiAnalysisModal: $('ai-analysis-modal'),
   btnCloseAiAnalysis: $('btn-close-ai-analysis'),
   aiAnalysisLoading: $('ai-analysis-loading'),
   aiAnalysisResults: $('ai-analysis-results'),
+  aiScoreChart:    $('ai-score-chart'),
+  aiScoreCanvas:   $('ai-score-canvas'),
   aiAnalysisError: $('ai-analysis-error'),
   aiErrorText:     $('ai-error-text'),
   aiRating:        $('ai-rating'),
@@ -210,8 +218,28 @@ async function init() {
     if (state.chart) updateElevationChart();
   });
 
-  // AI Analysis
-  els.btnAiAnalysis.addEventListener('click', runAiAnalysis);
+  // AI Analysis — show slider picker first
+  els.btnAiAnalysis.addEventListener('click', showAiSliderModal);
+  els.btnCloseAiSlider.addEventListener('click', () => {
+    els.aiSliderModal.classList.add('hidden');
+  });
+  els.aiSliderModal.addEventListener('click', (e) => {
+    if (e.target === els.aiSliderModal) els.aiSliderModal.classList.add('hidden');
+  });
+  els.aiActivitySlider.addEventListener('input', () => {
+    const val = els.aiActivitySlider.value;
+    els.aiSliderValue.textContent = val;
+    if (parseInt(val) > 10) {
+      els.aiSliderWarning.classList.remove('hidden');
+    } else {
+      els.aiSliderWarning.classList.add('hidden');
+    }
+  });
+  els.btnRunAiAnalysis.addEventListener('click', () => {
+    const count = parseInt(els.aiActivitySlider.value) || 5;
+    els.aiSliderModal.classList.add('hidden');
+    runAiAnalysis(count);
+  });
   els.btnCloseAiAnalysis.addEventListener('click', () => {
     els.aiAnalysisModal.classList.add('hidden');
   });
@@ -1331,16 +1359,44 @@ function renderGearStats() {
   });
 }
 
+// ─── AI Slider Modal ────────────────────────────────────────────────────────
+
+async function showAiSliderModal() {
+  // Reset slider to defaults while we fetch stats
+  els.aiActivitySlider.value = 5;
+  els.aiSliderValue.textContent = '5';
+  els.aiSliderWarning.classList.add('hidden');
+  els.aiSliderModal.classList.remove('hidden');
+
+  try {
+    const stats = await api('/api/athlete-stats');
+    const max = Math.max(1, stats.totalRides || 10);
+    els.aiActivitySlider.max = max;
+    // Keep current value in range
+    if (parseInt(els.aiActivitySlider.value) > max) {
+      els.aiActivitySlider.value = max;
+      els.aiSliderValue.textContent = max;
+    }
+  } catch {
+    // Fallback — leave slider max at a reasonable default
+    els.aiActivitySlider.max = 50;
+  }
+}
+
 // ─── AI Analysis ────────────────────────────────────────────────────────────
 
-async function runAiAnalysis() {
+async function runAiAnalysis(count = 10) {
   els.aiAnalysisModal.classList.remove('hidden');
   els.aiAnalysisLoading.classList.remove('hidden');
   els.aiAnalysisResults.classList.add('hidden');
   els.aiAnalysisError.classList.add('hidden');
 
+  // Update loading text to reflect chosen count
+  const loadingSpan = els.aiAnalysisLoading.querySelector('span');
+  if (loadingSpan) loadingSpan.textContent = `Analysing your last ${count} ride${count > 1 ? 's' : ''}...`;
+
   try {
-    const result = await api('/api/ai-analysis');
+    const result = await api(`/api/ai-analysis?count=${encodeURIComponent(count)}`);
 
     if (result.error) {
       els.aiAnalysisLoading.classList.add('hidden');
@@ -1388,6 +1444,9 @@ async function runAiAnalysis() {
     // Summary text
     els.aiSummary.textContent = result.summary;
 
+    // Score-over-time chart
+    renderAiScoreChart(result.activities);
+
     // Per-activity breakdown
     if (result.activities?.length) {
       els.aiActivities.innerHTML = `
@@ -1413,6 +1472,107 @@ async function runAiAnalysis() {
     els.aiAnalysisError.classList.remove('hidden');
     els.aiErrorText.textContent = 'Failed to run analysis. Check console for details.';
   }
+}
+
+// ─── AI Score-Over-Time Chart ───────────────────────────────────────────────
+
+let aiScoreChartInstance = null;
+
+function renderAiScoreChart(activities) {
+  if (!activities || activities.length < 2) {
+    els.aiScoreChart.classList.add('hidden');
+    return;
+  }
+
+  els.aiScoreChart.classList.remove('hidden');
+
+  // Sort chronologically (oldest first)
+  const sorted = [...activities].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  const labels = sorted.map(a =>
+    new Date(a.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  );
+
+  const mkDataset = (label, key, color, fill = false) => ({
+    label,
+    data: sorted.map(a => parseInt(a[key])),
+    borderColor: color,
+    backgroundColor: fill ? color.replace(')', ', 0.10)').replace('rgb', 'rgba') : 'transparent',
+    fill,
+    tension: 0.35,
+    pointRadius: 3,
+    pointBackgroundColor: color,
+    pointBorderWidth: 0,
+    pointHoverRadius: 5,
+    borderWidth: fill ? 2.5 : 1.5,
+    borderDash: fill ? [] : [4, 3]
+  });
+
+  // Destroy previous instance if it exists
+  if (aiScoreChartInstance) {
+    aiScoreChartInstance.destroy();
+    aiScoreChartInstance = null;
+  }
+
+  const ctx = els.aiScoreCanvas.getContext('2d');
+  aiScoreChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        mkDataset('Overall Score',       'overall',    'rgb(59, 130, 246)',  true),
+        mkDataset('Cadence Efficiency',   'cadence',    'rgb(34, 197, 94)'),
+        mkDataset('Cross-Chain Avoidance','crossChain', 'rgb(99, 102, 241)'),
+        mkDataset('Gradient Matching',    'gradient',   'rgb(245, 158, 11)'),
+        mkDataset('Shift Smoothness',     'hunting',    'rgb(139, 92, 246)')
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        y: {
+          min: 0,
+          max: 100,
+          ticks: {
+            callback: v => v + '%',
+            color: 'rgba(255,255,255,0.5)',
+            font: { size: 11 }
+          },
+          grid: { color: 'rgba(255,255,255,0.06)' }
+        },
+        x: {
+          ticks: {
+            color: 'rgba(255,255,255,0.5)',
+            font: { size: 11 },
+            maxRotation: 45
+          },
+          grid: { display: false }
+        }
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'bottom',
+          labels: {
+            color: 'rgba(255,255,255,0.7)',
+            font: { size: 11 },
+            boxWidth: 14,
+            padding: 12,
+            usePointStyle: true,
+            pointStyle: 'line'
+          }
+        },
+        tooltip: {
+          callbacks: {
+            title: (items) => sorted[items[0].dataIndex]?.name || items[0].label,
+            label: (item) => `${item.dataset.label}: ${item.raw}%`
+          }
+        }
+      }
+    }
+  });
 }
 
 async function loadOptimalGears() {

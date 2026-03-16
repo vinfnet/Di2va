@@ -117,6 +117,7 @@
         </div>
       </div>
       <div id="fit-library-banner" class="fit-library-banner hidden"></div>
+      <p class="activities-hint">Select a ride to see its detailed gear analysis — map, elevation profile, and shift statistics.</p>
       <div id="activities-list"></div>
       <div id="activities-loading" class="loading hidden">
         <div class="spinner"></div>
@@ -283,6 +284,29 @@
     </div>
   </div>
 
+  <!-- AI Activity Count Slider Modal -->
+  <div id="ai-slider-modal" class="modal-overlay hidden">
+    <div class="modal-card ai-slider-card">
+      <div class="modal-header">
+        <h3>🤖 AI Shifting Analysis</h3>
+        <button id="btn-close-ai-slider" class="btn btn-sm btn-outline">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="ai-slider-desc">How many recent rides would you like to analyse?</p>
+        <div class="ai-slider-row">
+          <input type="range" id="ai-activity-slider" min="1" max="10" value="5" class="ai-slider">
+          <span id="ai-slider-value" class="ai-slider-value">5</span>
+        </div>
+        <div id="ai-slider-warning" class="ai-slider-warning hidden">
+          ⚠️ Analysing more than 10 rides will take longer and will download multiple temporary .FIT files.
+        </div>
+        <div class="ai-slider-actions">
+          <button id="btn-run-ai-analysis" class="btn btn-accent">Analyse</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- AI Analysis Modal -->
   <div id="ai-analysis-modal" class="modal-overlay hidden">
     <div class="modal-card ai-analysis-card">
@@ -299,8 +323,16 @@
         <div id="ai-analysis-results" class="hidden">
           <div id="ai-rating" class="ai-rating"></div>
           <div id="ai-components" class="ai-components"></div>
+          <div id="ai-score-chart" class="ai-score-chart-wrap hidden">
+            <h4>Score Over Time</h4>
+            <canvas id="ai-score-canvas"></canvas>
+          </div>
           <pre id="ai-summary" class="ai-summary"></pre>
           <div id="ai-activities" class="ai-activities"></div>
+          <div class="ai-method-note">
+            <p><strong>How does this work?</strong> This analysis uses a deterministic, rules-based scoring engine — not a machine-learning model. It evaluates your shifting against established cycling best-practices (cadence range, cross-chain avoidance, gradient matching, shift smoothness) using data from the Strava API. We are investigating LLM-based approaches for richer, personalised feedback in a future release.</p>
+            <p>For full details of the scoring methodology, see the <a href="docs/AI_ANALYSIS.md" target="_blank">AI Analysis documentation</a>.</p>
+          </div>
         </div>
         <div id="ai-analysis-error" class="hidden">
           <p id="ai-error-text" class="ai-error-text"></p>

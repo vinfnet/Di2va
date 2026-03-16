@@ -1,5 +1,7 @@
 # Di2va
 
+> **Why does this exist?** Gear-shifting data has been a long-standing feature request in the Strava community — cyclists with electronic groupsets (Shimano Di2, SRAM AXS, Campagnolo EPS) upload FIT files that contain every shift event, yet Strava doesn't surface any of it. The request didn't seem to be moving, so I built my own tool. You may find it useful or, at the very least, interesting.
+
 **Visualize your Shimano Di2 electronic gear shift data from Strava cycling activities** — see exactly what gear you were in at every point on a map and elevation profile, with interactive gear statistics and a drivetrain visualization.
 
 ![screenshot](https://img.shields.io/badge/status-development-orange)

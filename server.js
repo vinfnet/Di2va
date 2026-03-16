@@ -790,6 +790,25 @@ function analyseShifting(streams, gearData) {
   };
 }
 
+app.get('/api/athlete-stats', async (req, res) => {
+  const token = await ensureValidToken(req);
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const athleteId = req.session.strava.athlete.id;
+    const apiClient = stravaApi(token);
+    const response = await apiClient.get(`/athletes/${athleteId}/stats`);
+    const rideCount = (response.data.all_ride_totals?.count || 0)
+                    + (response.data.all_ride_totals?.count ? 0 : 0);
+    // Include virtual rides too
+    const totalRides = rideCount;
+    res.json({ totalRides });
+  } catch (err) {
+    console.error('Athlete stats error:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to fetch athlete stats' });
+  }
+});
+
 app.get('/api/ai-analysis', async (req, res) => {
   const token = await ensureValidToken(req);
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
@@ -797,11 +816,24 @@ app.get('/api/ai-analysis', async (req, res) => {
   try {
     const apiClient = stravaApi(token);
 
-    // Fetch last 10 activities
-    const activitiesRes = await apiClient.get('/athlete/activities', {
-      params: { page: 1, per_page: 10 }
-    });
-    const rides = activitiesRes.data.filter(a => a.type === 'Ride' || a.type === 'VirtualRide');
+    // Use requested count (clamped 1–200) or default to 10
+    const requestedCount = Math.max(1, Math.min(200, parseInt(req.query.count) || 10));
+
+    // Fetch activities — may need multiple pages
+    let allRides = [];
+    const perPage = 50;
+    let page = 1;
+    while (allRides.length < requestedCount) {
+      const activitiesRes = await apiClient.get('/athlete/activities', {
+        params: { page, per_page: perPage }
+      });
+      if (activitiesRes.data.length === 0) break;
+      const rides = activitiesRes.data.filter(a => a.type === 'Ride' || a.type === 'VirtualRide');
+      allRides = allRides.concat(rides);
+      if (activitiesRes.data.length < perPage) break;
+      page++;
+    }
+    const rides = allRides.slice(0, requestedCount);
 
     if (rides.length === 0) {
       return res.json({ error: 'No rides found' });
@@ -813,7 +845,7 @@ app.get('/api/ai-analysis', async (req, res) => {
     let aggregateScores = { cadence: 0, crossChain: 0, gradient: 0, hunting: 0 };
     let analysedCount = 0;
 
-    for (const ride of rides.slice(0, 10)) {
+    for (const ride of rides) {
       try {
         // Fetch streams
         const streamTypes = 'time,latlng,altitude,distance,cadence,watts,grade_smooth,velocity_smooth';
@@ -853,7 +885,11 @@ app.get('/api/ai-analysis', async (req, res) => {
             name: ride.name,
             date: ride.start_date_local,
             rating: result.rating,
-            overall: result.overall
+            overall: result.overall,
+            cadence: result.components.cadence.score,
+            crossChain: result.components.crossChain.score,
+            gradient: result.components.gradient.score,
+            hunting: result.components.hunting.score
           });
           aggregateScores.cadence += parseFloat(result.components.cadence.score);
           aggregateScores.crossChain += parseFloat(result.components.crossChain.score);
