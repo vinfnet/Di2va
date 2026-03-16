@@ -226,47 +226,89 @@
             <span class="zoom-hint">Drag to select a section</span>
           </div>
         </div>
-        <div id="elevation-chart-wrapper">
-          <canvas id="elevation-chart"></canvas>
+        <div class="elevation-body">
+          <div id="elevation-chart-wrapper">
+            <canvas id="elevation-chart"></canvas>
+          </div>
+          <div id="hover-info" class="hover-info hidden">
+            <div class="hover-info-row hover-info-title">
+              <span id="hover-distance" class="hover-value"></span>
+            </div>
+            <div class="hover-info-row">
+              <span class="hover-label">Gear:</span>
+              <span id="hover-gear" class="hover-value"></span>
+            </div>
+            <div class="hover-info-row">
+              <span class="hover-label">Elevation:</span>
+              <span id="hover-elevation" class="hover-value"></span>
+            </div>
+            <div class="hover-info-row">
+              <span class="hover-label">Gradient:</span>
+              <span id="hover-gradient" class="hover-value"></span>
+            </div>
+            <div class="hover-info-row">
+              <span class="hover-label">Speed:</span>
+              <span id="hover-speed" class="hover-value"></span>
+            </div>
+            <div class="hover-info-row">
+              <span class="hover-label">Cadence:</span>
+              <span id="hover-cadence" class="hover-value"></span>
+            </div>
+            <div class="hover-info-row">
+              <span class="hover-label">Power:</span>
+              <span id="hover-power" class="hover-value"></span>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <!-- Position Marker Info -->
-        <div id="hover-info" class="hover-info hidden">
-          <div class="hover-info-row hover-info-title">
-            <span id="hover-distance" class="hover-value"></span>
+      <!-- Drivetrain Replay Section -->
+      <div id="replay-section" class="replay-section hidden">
+        <div class="replay-layout">
+          <div class="replay-left">
+            <div id="replay-drivetrain" class="replay-drivetrain"></div>
+            <div class="replay-controls">
+              <button id="btn-replay-play" class="btn btn-sm btn-accent">▶ Replay Ride</button>
+              <div class="replay-speed-group">
+                <button class="replay-speed-btn active" data-speed="1">1×</button>
+                <button class="replay-speed-btn" data-speed="2">2×</button>
+                <button class="replay-speed-btn" data-speed="5">5×</button>
+                <button class="replay-speed-btn" data-speed="10">10×</button>
+                <button class="replay-speed-btn" data-speed="20">20×</button>
+              </div>
+            </div>
+            <div class="replay-progress-row">
+              <input type="range" id="replay-scrubber" class="replay-scrubber" min="0" max="100" value="0">
+              <span id="replay-time" class="replay-time">0:00 / 0:00</span>
+            </div>
           </div>
-          <div class="hover-info-row">
-            <span class="hover-label">Gear:</span>
-            <span id="hover-gear" class="hover-value"></span>
+          <div class="replay-power-bar-wrapper">
+            <div class="replay-power-label">Power</div>
+            <div class="replay-power-track">
+              <div id="replay-power-fill" class="replay-power-fill"></div>
+              <div id="replay-power-ideal" class="replay-power-ideal" title="Estimated ideal power"></div>
+            </div>
+            <div id="replay-power-value" class="replay-power-value">— W</div>
+            <div class="replay-power-note">*est. vs weight</div>
           </div>
-          <div class="hover-info-row">
-            <span class="hover-label">Elevation:</span>
-            <span id="hover-elevation" class="hover-value"></span>
-          </div>
-          <div class="hover-info-row">
-            <span class="hover-label">Gradient:</span>
-            <span id="hover-gradient" class="hover-value"></span>
-          </div>
-          <div class="hover-info-row">
-            <span class="hover-label">Speed:</span>
-            <span id="hover-speed" class="hover-value"></span>
-          </div>
-          <div class="hover-info-row">
-            <span class="hover-label">Cadence:</span>
-            <span id="hover-cadence" class="hover-value"></span>
-          </div>
-          <div class="hover-info-row">
-            <span class="hover-label">Power:</span>
-            <span id="hover-power" class="hover-value"></span>
+          <div class="replay-right">
+            <div id="replay-ai-box" class="replay-ai-box">
+              <h4>🤖 AI Shifting Analysis</h4>
+              <div id="replay-ai-content" class="replay-ai-content">
+                <p class="replay-ai-hint">Press ▶ Replay Ride or hover the elevation chart to see analysis</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Gear Stats -->
       <div id="gear-stats-container" class="gear-stats-container hidden">
-        <h3>Gear Usage Summary</h3>
-        <p class="gear-stats-hint">Click any gear to see the interactive drivetrain visualization</p>
-        <div id="gear-stats" class="gear-stats-grid"></div>
+        <h3 class="gear-stats-toggle" id="gear-stats-toggle">Gear Usage Summary <span class="toggle-arrow">▶</span></h3>
+        <div id="gear-stats-body" class="gear-stats-body collapsed">
+          <p class="gear-stats-hint">Click any gear to see the interactive drivetrain visualization</p>
+          <div id="gear-stats" class="gear-stats-grid"></div>
+        </div>
       </div>
 
     </section>

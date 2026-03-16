@@ -724,6 +724,57 @@ function drawGearColoredRoute(latlngs, gears) {
 
     state.routeLayers.push(polyline);
   });
+
+  // Map click: find nearest data point and sync replay
+  state.map.on('click', _onMapClick);
+}
+
+function _onMapClick(e) {
+  const streams = state.streams;
+  if (!streams?.latlng) return;
+  const latlngs = streams.latlng;
+  const clickLat = e.latlng.lat;
+  const clickLng = e.latlng.lng;
+  let bestIdx = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < latlngs.length; i++) {
+    const dLat = latlngs[i][0] - clickLat;
+    const dLng = latlngs[i][1] - clickLng;
+    const d = dLat * dLat + dLng * dLng;
+    if (d < bestDist) { bestDist = d; bestIdx = i; }
+  }
+  _syncReplayToIndex(bestIdx);
+}
+
+function _syncReplayToIndex(index) {
+  const streams = state.streams;
+  if (!streams?.time || !state.gearData) return;
+
+  // Ensure replay is initialised (paused)
+  if (!_replay) {
+    _startReplay(true);
+    // After async init, retry sync
+    const waitForReplay = () => {
+      if (_replay) {
+        _doSyncReplayToIndex(index);
+      } else {
+        requestAnimationFrame(waitForReplay);
+      }
+    };
+    requestAnimationFrame(waitForReplay);
+    return;
+  }
+  _doSyncReplayToIndex(index);
+}
+
+function _doSyncReplayToIndex(index) {
+  if (!_replay) return;
+  const streams = state.streams;
+  _replay.index = Math.min(index, _replay.maxIndex);
+  _replay.rideTime = streams.time[_replay.index] || 0;
+  _updateReplayFrame();
+  // Update scrubber
+  document.getElementById('replay-scrubber').value = _replay.index;
 }
 
 function addStartEndMarkers(latlngs) {
@@ -764,6 +815,37 @@ function getGearColor(gearData) {
   const colorIdx = Math.min(rearIdx, GEAR_COLORS.length - 1);
   return GEAR_COLORS[GEAR_COLORS.length - 1 - colorIdx];
 }
+
+// ─── Chart Replay Position Line Plugin ───────────────────────────────────────
+
+const replayPosPlugin = {
+  id: 'replayPosLine',
+  afterDatasetsDraw(chart) {
+    const idx = chart._replayIndex;
+    if (idx == null || idx < 0) return;
+    const meta = chart.getDatasetMeta(0);
+    const pt = meta.data[idx];
+    if (!pt) return;
+    const { ctx, chartArea: { top, bottom } } = chart;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pt.x, top);
+    ctx.lineTo(pt.x, bottom);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#ff3333';
+    ctx.shadowColor = '#ff3333';
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ff3333';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+};
 
 // ─── Chart Magnify Plugin ───────────────────────────────────────────────────
 
@@ -1093,7 +1175,7 @@ function updateElevationChart() {
   state.chart = new Chart(ctx, {
     type: 'line',
     data: { labels: distances, datasets },
-    plugins: [magnifyPlugin],
+    plugins: [replayPosPlugin, magnifyPlugin],
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -1182,6 +1264,11 @@ function updateElevationChart() {
           const idx = elements[0].index;
           highlightPoint(idx);
         }
+      },
+      onClick: (event, elements) => {
+        if (elements.length > 0) {
+          _syncReplayToIndex(elements[0].index);
+        }
       }
     }
   });
@@ -1256,6 +1343,13 @@ function highlightPoint(index) {
     ? `${streams.cadence[index]} rpm` : '—';
   els.hoverPower.textContent = streams.watts?.[index]
     ? `${streams.watts[index]} W` : '—';
+
+  // Update inline drivetrain + AI panel on hover (not during active replay playback)
+  if (!_replay?.playing) {
+    _updateReplayDrivetrain(index);
+    _updateReplayAI(index);
+    _updatePowerBar(index);
+  }
 }
 
 // ─── Gear Legend ────────────────────────────────────────────────────────────
@@ -1297,8 +1391,12 @@ function renderGearStats() {
   const gears = state.gearData;
   if (!gears) {
     els.gearStatsContainer.classList.add('hidden');
+    document.getElementById('replay-section')?.classList.add('hidden');
     return;
   }
+
+  // Init the replay/drivetrain section
+  _initReplaySection();
 
   // Count time/distance in each gear
   const gearCounts = new Map();
@@ -1360,6 +1458,16 @@ function renderGearStats() {
       showGearPopup(front, rear, color);
     });
   });
+
+  // Wire collapsible toggle
+  const toggle = document.getElementById('gear-stats-toggle');
+  const body = document.getElementById('gear-stats-body');
+  if (toggle && body) {
+    toggle.onclick = () => {
+      body.classList.toggle('collapsed');
+      toggle.querySelector('.toggle-arrow').textContent = body.classList.contains('collapsed') ? '▶' : '▼';
+    };
+  }
 }
 
 // ─── AI Slider Modal ────────────────────────────────────────────────────────
@@ -2119,7 +2227,7 @@ function gearPath(cx, cy, teeth, outerR, innerR) {
  * Render an animated SVG drivetrain diagram showing chainrings + cassette.
  * Cogs rotate as if pedalling — front at cadence, rear faster by gear ratio.
  */
-function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activeRear, activeColor) {
+function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activeRear, activeColor, opts) {
   const W = 740, H = 400;
   const FRONT_CX = 530, FRONT_CY = 195;
   const REAR_CX = 190, REAR_CY = 195;
@@ -2135,9 +2243,10 @@ function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activ
   // Scale: pixels per tooth
   const SCALE = 2.8;
 
-  // Animation: front pedal period (seconds), rear spins faster by gear ratio
-  const FRONT_DUR = 3;   // ~20 RPM — gentle, easy to see teeth
+  // Rotation: if opts.frontAngle use static transform, else SMIL
+  const useStatic = opts && opts.frontAngle != null;
   const gearRatio = activeFront / activeRear;
+  const FRONT_DUR = 3;
   const REAR_DUR = (FRONT_DUR / gearRatio).toFixed(3);
 
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" ` +
@@ -2157,6 +2266,7 @@ function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activ
   // ── Chain (static — represents the tangent path the chain follows) ──
   const activeFrontR = activeFront * SCALE;
   const activeRearR = activeRear * SCALE;
+  if (!(opts && opts.noChain)) {
   // Top tangent
   svg += `<line x1="${FRONT_CX}" y1="${FRONT_CY - activeFrontR}" ` +
     `x2="${REAR_CX}" y2="${REAR_CY - activeRearR}" ` +
@@ -2172,14 +2282,20 @@ function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activ
   svg += `<path d="M${REAR_CX},${REAR_CY + activeRearR} ` +
     `A${activeRearR},${activeRearR} 0 1,0 ${REAR_CX},${REAR_CY - activeRearR}" ` +
     `fill="none" stroke="#ff8800" stroke-width="3" opacity="0.5"/>`;
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ── REAR CASSETTE (rotating group) ──
   // ═══════════════════════════════════════════════════════════════════════════
-  svg += `<g>`;
-  svg += `<animateTransform attributeName="transform" type="rotate" ` +
-    `from="0 ${REAR_CX} ${REAR_CY}" to="360 ${REAR_CX} ${REAR_CY}" ` +
-    `dur="${REAR_DUR}s" repeatCount="indefinite"/>`;
+  if (useStatic) {
+    const ra = ((opts.frontAngle * gearRatio) % 360).toFixed(2);
+    svg += `<g transform="rotate(${ra} ${REAR_CX} ${REAR_CY})">`;
+  } else {
+    svg += `<g>`;
+    svg += `<animateTransform attributeName="transform" type="rotate" ` +
+      `from="0 ${REAR_CX} ${REAR_CY}" to="360 ${REAR_CX} ${REAR_CY}" ` +
+      `dur="${REAR_DUR}s" repeatCount="indefinite"/>`;
+  }
 
   const rearSorted = [...allRear].sort((a, b) => b - a); // biggest first (drawn first = behind)
   rearSorted.forEach((teeth) => {
@@ -2207,10 +2323,15 @@ function renderDrivetrainSVG(container, chainrings, cassette, activeFront, activ
   // ═══════════════════════════════════════════════════════════════════════════
   // ── FRONT CHAINRINGS + CRANK (rotating group) ──
   // ═══════════════════════════════════════════════════════════════════════════
-  svg += `<g>`;
-  svg += `<animateTransform attributeName="transform" type="rotate" ` +
-    `from="0 ${FRONT_CX} ${FRONT_CY}" to="360 ${FRONT_CX} ${FRONT_CY}" ` +
-    `dur="${FRONT_DUR}s" repeatCount="indefinite"/>`;
+  if (useStatic) {
+    const fa = (opts.frontAngle % 360).toFixed(2);
+    svg += `<g transform="rotate(${fa} ${FRONT_CX} ${FRONT_CY})">`;
+  } else {
+    svg += `<g>`;
+    svg += `<animateTransform attributeName="transform" type="rotate" ` +
+      `from="0 ${FRONT_CX} ${FRONT_CY}" to="360 ${FRONT_CX} ${FRONT_CY}" ` +
+      `dur="${FRONT_DUR}s" repeatCount="indefinite"/>`;
+  }
 
   const frontSorted = [...allFront].sort((a, b) => b - a); // biggest first
   frontSorted.forEach((teeth) => {
@@ -2472,6 +2593,430 @@ function closeGearPopup() {
   const nav = document.getElementById('gear-popup-nav');
   if (nav) nav.innerHTML = '';
   document.getElementById('gear-popup').classList.add('hidden');
+}
+
+// ─── Ride Replay Engine ─────────────────────────────────────────────────────
+
+let _replay = null;
+
+const REPLAY_AI_CATEGORIES = {
+  cadence:    { icon: '🔄', label: 'Cadence' },
+  crossChain: { icon: '⛓️', label: 'Cross-chain' },
+  gradient:   { icon: '⛰️', label: 'Gradient match' },
+  hunting:    { icon: '↕️', label: 'Shift smoothness' }
+};
+
+function _initReplaySection() {
+  const section = document.getElementById('replay-section');
+  if (!section || !state.gearData) return;
+
+  section.classList.remove('hidden');
+
+  // Build chainring/cassette sets
+  const frontSet = new Set(), rearSet = new Set();
+  state.gearData.forEach(g => {
+    if (g?.front) frontSet.add(g.front);
+    if (g?.rear) rearSet.add(g.rear);
+  });
+  state._replayChainrings = [...frontSet].sort((a, b) => a - b);
+  state._replayCassette = [...rearSet].sort((a, b) => a - b);
+  state._replayLastFront = null;
+  state._replayLastRear = null;
+
+  // Compute max watts for power bar scaling
+  const watts = state.streams?.watts;
+  state._replayMaxWatts = watts ? Math.max(...watts.filter(w => w > 0)) : 0;
+
+  // Render with the first gear found — no chain until replay starts
+  const first = state.gearData.find(g => g?.front && g?.rear);
+  if (first) {
+    const container = document.getElementById('replay-drivetrain');
+    renderDrivetrainSVG(container, state._replayChainrings, state._replayCassette,
+      first.front, first.rear, getGearColor(first), { noChain: true });
+    state._replayLastFront = first.front;
+    state._replayLastRear = first.rear;
+  }
+
+  // Wire replay button (once)
+  const playBtn = document.getElementById('btn-replay-play');
+  playBtn.onclick = () => {
+    if (_replay?.playing) {
+      _pauseReplay();
+    } else if (_replay) {
+      _resumeReplay();
+    } else {
+      _startReplay();
+    }
+  };
+
+  // Wire scrubber
+  document.getElementById('replay-scrubber').oninput = function() {
+    if (!_replay) _startReplay(true); // init without auto-play
+    _replay.index = parseInt(this.value);
+    _replay.rideTime = state.streams.time[_replay.index] || 0;
+    _updateReplayFrame();
+  };
+
+  // Wire speed buttons
+  document.querySelector('.replay-speed-group').onclick = (e) => {
+    const btn = e.target.closest('.replay-speed-btn');
+    if (!btn) return;
+    const speed = parseInt(btn.dataset.speed);
+    if (_replay) _replay.speed = speed;
+    document.querySelectorAll('.replay-speed-btn').forEach(b =>
+      b.classList.toggle('active', b === btn)
+    );
+  };
+
+  // Configure scrubber max
+  const maxIndex = Math.min(
+    (state.streams?.time?.length || 1) - 1,
+    state.gearData.length - 1
+  );
+  document.getElementById('replay-scrubber').max = maxIndex;
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', _replayKeyHandler);
+
+  // Initialize replay paused at the start of the ride
+  _startReplay(true);
+}
+
+function _replayKeyHandler(e) {
+  if (e.key === ' ' && document.activeElement?.tagName !== 'INPUT') {
+    e.preventDefault();
+    const playBtn = document.getElementById('btn-replay-play');
+    if (playBtn) playBtn.click();
+  }
+}
+
+function _startReplay(paused) {
+  const streams = state.streams;
+  if (!streams?.time || !state.gearData) return;
+
+  // Ensure optimal gears are loaded
+  if (!state.optimalGears) {
+    loadOptimalGears().then(() => _doStartReplay(paused));
+  } else {
+    _doStartReplay(paused);
+  }
+}
+
+function _doStartReplay(paused) {
+  const streams = state.streams;
+  const maxIndex = Math.min(streams.time.length, state.gearData.length) - 1;
+
+  // Get current speed from active button
+  const activeSpeedBtn = document.querySelector('.replay-speed-btn.active');
+  const speed = activeSpeedBtn ? parseInt(activeSpeedBtn.dataset.speed) : 1;
+
+  _replay = {
+    playing: !paused,
+    speed,
+    frameId: null,
+    index: 0,
+    maxIndex,
+    lastTimestamp: null,
+    rideTime: streams.time[0] || 0,
+    rotationAngle: 0,
+    lastFront: null,
+    lastRear: null
+  };
+
+  const playBtn = document.getElementById('btn-replay-play');
+  playBtn.textContent = paused ? '▶ Replay Ride' : '⏸ Pause';
+
+  if (!paused) {
+    _replay.frameId = requestAnimationFrame(_replayTick);
+  }
+
+  _updateReplayFrame();
+}
+
+function _pauseReplay() {
+  if (!_replay) return;
+  _replay.playing = false;
+  if (_replay.frameId) {
+    cancelAnimationFrame(_replay.frameId);
+    _replay.frameId = null;
+  }
+  document.getElementById('btn-replay-play').textContent = '▶ Replay Ride';
+}
+
+function _resumeReplay() {
+  if (!_replay) return;
+  _replay.playing = true;
+  _replay.lastTimestamp = null;
+  _replay.rideTime = state.streams.time[_replay.index] || 0;
+  _replay.frameId = requestAnimationFrame(_replayTick);
+  document.getElementById('btn-replay-play').textContent = '⏸ Pause';
+}
+
+function _stopReplay() {
+  if (!_replay) return;
+  if (_replay.frameId) cancelAnimationFrame(_replay.frameId);
+
+  // Clear position marker on main chart
+  if (state.chart) {
+    state.chart._replayIndex = -1;
+    state.chart.draw();
+  }
+
+  _replay = null;
+  document.getElementById('btn-replay-play').textContent = '▶ Replay Ride';
+
+  // Re-render drivetrain with SMIL
+  state._replayLastFront = null;
+  state._replayLastRear = null;
+}
+
+function _replayTick(timestamp) {
+  if (!_replay || !_replay.playing) return;
+
+  if (_replay.lastTimestamp === null) {
+    _replay.lastTimestamp = timestamp;
+    _replay.frameId = requestAnimationFrame(_replayTick);
+    return;
+  }
+
+  const elapsed = (timestamp - _replay.lastTimestamp) / 1000;
+  _replay.lastTimestamp = timestamp;
+
+  // Accumulate ride time
+  _replay.rideTime += elapsed * _replay.speed;
+
+  // Accumulate gear rotation from cadence
+  const cadenceNow = state.streams.cadence?.[_replay.index];
+  if (cadenceNow > 0) {
+    _replay.rotationAngle += (cadenceNow / 60) * 360 * elapsed * _replay.speed;
+  }
+
+  // Find data index matching accumulated ride time
+  const streams = state.streams;
+  let newIndex = _replay.index;
+  while (newIndex < _replay.maxIndex && (streams.time[newIndex + 1] || Infinity) <= _replay.rideTime) {
+    newIndex++;
+  }
+
+  if (newIndex !== _replay.index) {
+    _replay.index = newIndex;
+    _updateReplayFrame();
+  } else {
+    // Update rotation even if index hasn't changed
+    _updateReplayRotation();
+  }
+
+  if (_replay.index >= _replay.maxIndex) {
+    _replay.playing = false;
+    document.getElementById('btn-replay-play').textContent = '▶ Replay Ride';
+    return;
+  }
+
+  _replay.frameId = requestAnimationFrame(_replayTick);
+}
+
+function _updateReplayFrame() {
+  if (!_replay) return;
+  const i = _replay.index;
+  const streams = state.streams;
+  const gear = state.gearData[i];
+
+  // Update scrubber + time
+  document.getElementById('replay-scrubber').value = i;
+  const curSec = streams.time[i] || 0;
+  const totSec = streams.time[_replay.maxIndex] || 0;
+  document.getElementById('replay-time').textContent =
+    `${_fmtTime(curSec)} / ${_fmtTime(totSec)}`;
+
+  // Update drivetrain
+  const front = gear?.front || state._replayChainrings[1] || 50;
+  const rear = gear?.rear || state._replayCassette[0] || 11;
+  const color = gear?.front ? getGearColor(gear) : '#555';
+  const container = document.getElementById('replay-drivetrain');
+
+  if (front !== _replay.lastFront || rear !== _replay.lastRear) {
+    renderDrivetrainSVG(container, state._replayChainrings, state._replayCassette,
+      front, rear, color, { frontAngle: _replay.rotationAngle });
+    _replay.lastFront = front;
+    _replay.lastRear = rear;
+    state._replayLastFront = front;
+    state._replayLastRear = rear;
+  } else {
+    _updateReplayRotation();
+  }
+
+  // Sync map marker + hover info
+  highlightPoint(i);
+
+  // Update position marker on elevation chart
+  if (state.chart) {
+    state.chart._replayIndex = i;
+    state.chart.draw();
+  }
+
+  // AI analysis
+  _updateReplayAI(i);
+
+  // Power bar
+  _updatePowerBar(i);
+}
+
+function _updateReplayRotation() {
+  if (!_replay) return;
+  const svgEl = document.getElementById('replay-drivetrain')?.querySelector('svg');
+  if (!svgEl) return;
+  const groups = svgEl.querySelectorAll(':scope > g[transform]');
+  const front = _replay.lastFront || 50;
+  const rear = _replay.lastRear || 11;
+  const ratio = front / rear;
+  const fa = (_replay.rotationAngle % 360).toFixed(2);
+  const ra = ((_replay.rotationAngle * ratio) % 360).toFixed(2);
+  if (groups[0]) groups[0].setAttribute('transform', `rotate(${ra} 190 195)`);
+  if (groups[1]) groups[1].setAttribute('transform', `rotate(${fa} 530 195)`);
+}
+
+function _updateReplayDrivetrain(index) {
+  const gear = state.gearData?.[index];
+  if (!gear?.front || !gear?.rear) return;
+  if (!state._replayChainrings) return;
+
+  if (gear.front === state._replayLastFront && gear.rear === state._replayLastRear) return;
+
+  const container = document.getElementById('replay-drivetrain');
+  if (!container) return;
+  renderDrivetrainSVG(container, state._replayChainrings, state._replayCassette,
+    gear.front, gear.rear, getGearColor(gear));
+  state._replayLastFront = gear.front;
+  state._replayLastRear = gear.rear;
+}
+
+function _updateReplayAI(index) {
+  const content = document.getElementById('replay-ai-content');
+  if (!content) return;
+
+  const gear = state.gearData?.[index];
+  const front = gear?.front;
+  const rear = gear?.rear;
+
+  if (!front || !rear) {
+    content.innerHTML = '<p class="replay-ai-hint">No gear data at this point</p>';
+    return;
+  }
+
+  const streams = state.streams;
+  const optimal = state.optimalGears?.[index];
+  const gearMatch = optimal && optimal.front === front && optimal.rear === rear;
+
+  // Evaluate each category
+  const issues = {};
+
+  // 1. Cadence
+  const cadence = streams.cadence?.[index];
+  if (cadence != null && cadence > 0 && (cadence < 80 || cadence > 100)) {
+    issues.cadence = cadence < 80
+      ? `${cadence} rpm — too low, aim for ~90 rpm`
+      : `${cadence} rpm — too high, aim for ~90 rpm`;
+  }
+
+  // 2. Cross-chain
+  const chainrings = state._replayChainrings || [];
+  const cassette = state._replayCassette || [];
+  const bigRing = Math.max(...chainrings);
+  const smallRing = Math.min(...chainrings);
+  const cogsSorted = [...cassette].sort((a, b) => a - b);
+  const cogIdx = cogsSorted.indexOf(rear);
+  const isBigBig = front === bigRing && cogIdx >= cogsSorted.length - 3;
+  const isSmallSmall = front === smallRing && cogIdx <= 2;
+  if (isBigBig || isSmallSmall) {
+    issues.crossChain = isBigBig
+      ? `Big ring + big cog — cross-chaining`
+      : `Small ring + small cog — cross-chaining`;
+  }
+
+  // 3. Gradient match
+  if (optimal) {
+    const actualRatio = front / rear;
+    const optRatio = optimal.front / optimal.rear;
+    const gradient = streams.grade_smooth?.[index];
+    if (Math.abs(actualRatio - optRatio) > 0.3 && gradient != null) {
+      issues.gradient = gradient > 2
+        ? `${gradient.toFixed(1)}% climb — shift easier`
+        : gradient < -2
+          ? `${gradient.toFixed(1)}% descent — shift harder`
+          : `Gear doesn't match terrain`;
+    }
+  }
+
+  // 4. Shift smoothness (gear hunting)
+  if (index >= 3) {
+    let shifts = 0;
+    for (let j = Math.max(0, index - 5); j < index; j++) {
+      const p = state.gearData[j], n = state.gearData[j + 1];
+      if (p?.front && n?.front && (p.front !== n.front || p.rear !== n.rear)) shifts++;
+    }
+    if (shifts >= 3) {
+      issues.hunting = `${shifts} shifts in 5 seconds — gear hunting`;
+    }
+  }
+
+  // Build HTML — fixed table layout
+  const gearLine = optimal
+    ? gearMatch
+      ? `<div class="replay-ai-gear ai-ok">✅ ${front}/${rear} — optimal gear</div>`
+      : `<div class="replay-ai-gear">Suggested: <strong>${optimal.front}/${optimal.rear}</strong> (current ${front}/${rear})</div>`
+    : `<div class="replay-ai-gear">Current: <strong>${front}/${rear}</strong></div>`;
+
+  const rows = Object.keys(REPLAY_AI_CATEGORIES).map(key => {
+    const cat = REPLAY_AI_CATEGORIES[key];
+    const issue = issues[key];
+    const cls = issue ? 'ai-warn' : 'ai-ok';
+    const icon = issue ? '❌' : '✅';
+    const text = issue || 'OK';
+    return `<tr class="${cls}"><td class="ai-col-status">${icon}</td><td class="ai-col-icon">${cat.icon}</td><td class="ai-col-label">${cat.label}</td><td class="ai-col-text">${text}</td></tr>`;
+  }).join('');
+
+  content.innerHTML = gearLine + `<table class="replay-ai-table"><tbody>${rows}</tbody></table>`;
+}
+
+function _fmtTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function _updatePowerBar(index) {
+  const fill = document.getElementById('replay-power-fill');
+  const idealEl = document.getElementById('replay-power-ideal');
+  const valueEl = document.getElementById('replay-power-value');
+  if (!fill || !valueEl) return;
+
+  const watts = state.streams?.watts?.[index] || 0;
+  const maxW = state._replayMaxWatts || 1;
+  const pct = Math.min(100, (watts / maxW) * 100);
+
+  fill.style.height = `${pct}%`;
+  // Color: green < 60%, yellow 60-80%, red > 80%
+  fill.style.background = pct < 60 ? '#4caf50' : pct < 80 ? '#ffb74d' : '#ef5350';
+  valueEl.textContent = watts > 0 ? `${watts} W` : '— W';
+
+  // Ideal power based on gradient and rider weight
+  if (idealEl) {
+    const weight = state.athlete?.weight || 70; // kg
+    const gradient = state.streams?.grade_smooth?.[index] || 0;
+    const speed = state.streams?.velocity_smooth?.[index] || 5; // m/s
+    // Simplified model: P = (rolling + gravity + aero) 
+    // Rolling ~0.005 * weight * 9.81 * speed
+    // Gravity = weight * 9.81 * (gradient/100) * speed
+    // Aero ~0.3 * speed^2 (simplified CdA * 0.5 * rho)
+    const rolling = 0.005 * weight * 9.81 * speed;
+    const gravity = weight * 9.81 * (gradient / 100) * speed;
+    const aero = 0.3 * speed * speed;
+    const idealW = Math.max(0, Math.round(rolling + gravity + aero));
+    const idealPct = Math.min(100, (idealW / maxW) * 100);
+    idealEl.style.bottom = `${idealPct}%`;
+    idealEl.title = `Est. ideal: ${idealW} W (${(idealW / weight).toFixed(1)} W/kg)`;
+    idealEl.style.display = maxW > 0 ? '' : 'none';
+  }
 }
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
