@@ -73,6 +73,7 @@ let state = {
   gearData: null,        // Gear data per data point
   fitGearData: null,     // Raw FIT file gear data
   usingFitData: false,
+  optimalGears: null,    // AI-computed optimal gears per data point
   page: 1,
   map: null,
   routeLayers: [],
@@ -137,7 +138,31 @@ const els = {
   btnSaveFitFolder: $('btn-save-fit-folder'),
   fitLibraryStatus: $('fit-library-status'),
   fitLibraryBanner: $('fit-library-banner'),
-  unitsSelect:     $('units-select')
+  unitsSelect:     $('units-select'),
+  // AI Analysis
+  btnAiAnalysis:   $('btn-ai-analysis'),
+  aiSliderModal:   $('ai-slider-modal'),
+  btnCloseAiSlider: $('btn-close-ai-slider'),
+  aiActivitySlider: $('ai-activity-slider'),
+  aiSliderValue:   $('ai-slider-value'),
+  aiSliderWarning: $('ai-slider-warning'),
+  btnRunAiAnalysis: $('btn-run-ai-analysis'),
+  aiAnalysisModal: $('ai-analysis-modal'),
+  btnCloseAiAnalysis: $('btn-close-ai-analysis'),
+  aiAnalysisLoading: $('ai-analysis-loading'),
+  aiProgress:        $('ai-progress'),
+  aiProgressFill:    $('ai-progress-fill'),
+  aiProgressText:    $('ai-progress-text'),
+  aiAnalysisResults: $('ai-analysis-results'),
+  aiScoreChart:    $('ai-score-chart'),
+  aiScoreCanvas:   $('ai-score-canvas'),
+  aiAnalysisError: $('ai-analysis-error'),
+  aiErrorText:     $('ai-error-text'),
+  aiRating:        $('ai-rating'),
+  aiComponents:    $('ai-components'),
+  aiSummary:       $('ai-summary'),
+  aiActivities:    $('ai-activities'),
+  toggleOptimalGear: $('toggle-optimal-gear')
 };
 
 // ─── API Helpers ────────────────────────────────────────────────────────────
@@ -188,6 +213,41 @@ async function init() {
   });
   els.toggleCadence.addEventListener('change', () => {
     if (state.chart) updateElevationChart();
+  });
+  els.toggleOptimalGear.addEventListener('change', async () => {
+    if (els.toggleOptimalGear.checked && !state.optimalGears) {
+      await loadOptimalGears();
+    }
+    if (state.chart) updateElevationChart();
+  });
+
+  // AI Analysis — show slider picker first
+  els.btnAiAnalysis.addEventListener('click', showAiSliderModal);
+  els.btnCloseAiSlider.addEventListener('click', () => {
+    els.aiSliderModal.classList.add('hidden');
+  });
+  els.aiSliderModal.addEventListener('click', (e) => {
+    if (e.target === els.aiSliderModal) els.aiSliderModal.classList.add('hidden');
+  });
+  els.aiActivitySlider.addEventListener('input', () => {
+    const val = els.aiActivitySlider.value;
+    els.aiSliderValue.textContent = val;
+    if (parseInt(val) > 10) {
+      els.aiSliderWarning.classList.remove('hidden');
+    } else {
+      els.aiSliderWarning.classList.add('hidden');
+    }
+  });
+  els.btnRunAiAnalysis.addEventListener('click', () => {
+    const count = parseInt(els.aiActivitySlider.value) || 5;
+    els.aiSliderModal.classList.add('hidden');
+    runAiAnalysis(count);
+  });
+  els.btnCloseAiAnalysis.addEventListener('click', () => {
+    els.aiAnalysisModal.classList.add('hidden');
+  });
+  els.aiAnalysisModal.addEventListener('click', (e) => {
+    if (e.target === els.aiAnalysisModal) els.aiAnalysisModal.classList.add('hidden');
   });
 
   // Fullscreen toggles
@@ -343,6 +403,8 @@ async function openActivity(activity) {
   state.gearData = null;
   state.fitGearData = null;
   state.usingFitData = false;
+  state.optimalGears = null;
+  els.toggleOptimalGear.checked = false;
 
   // Set header
   els.detailTitle.textContent = activity.name;
@@ -868,6 +930,7 @@ function updateElevationChart() {
   const gears = state.gearData;
   const showGradient = els.toggleGradient.checked;
   const showCadence = els.toggleCadence.checked;
+  const showOptimalGear = els.toggleOptimalGear.checked;
 
   if (state.chart) {
     state.chart.destroy();
@@ -1004,6 +1067,29 @@ function updateElevationChart() {
     });
   }
 
+  // Add optimal gear ratio overlay
+  const optimalRatioData = [];
+  if (showOptimalGear && state.optimalGears) {
+    for (let i = 0; i < state.optimalGears.length; i++) {
+      const g = state.optimalGears[i];
+      optimalRatioData.push(g ? (g.front / g.rear) : null);
+    }
+  }
+  if (showOptimalGear && optimalRatioData.length > 0) {
+    datasets.push({
+      label: 'Optimal Gear Ratio',
+      data: optimalRatioData,
+      borderColor: 'rgba(251, 191, 36, 0.7)',
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderDash: [6, 3],
+      pointRadius: 0,
+      fill: false,
+      tension: 0.3,
+      yAxisID: 'y3'
+    });
+  }
+
   state.chart = new Chart(ctx, {
     type: 'line',
     data: { labels: distances, datasets },
@@ -1078,6 +1164,15 @@ function updateElevationChart() {
             position: 'right',
             title: { display: true, text: 'Cadence (rpm)', color: 'rgba(34, 197, 94, 0.7)' },
             ticks: { color: 'rgba(34, 197, 94, 0.7)' },
+            grid: { display: false }
+          }
+        } : {}),
+        ...(showOptimalGear && optimalRatioData.length > 0 ? {
+          y3: {
+            display: true,
+            position: 'right',
+            title: { display: true, text: 'Gear Ratio', color: 'rgba(251, 191, 36, 0.7)' },
+            ticks: { color: 'rgba(251, 191, 36, 0.7)' },
             grid: { display: false }
           }
         } : {})
@@ -1265,6 +1360,274 @@ function renderGearStats() {
       showGearPopup(front, rear, color);
     });
   });
+}
+
+// ─── AI Slider Modal ────────────────────────────────────────────────────────
+
+async function showAiSliderModal() {
+  // Reset slider to defaults while we fetch stats
+  els.aiActivitySlider.value = 5;
+  els.aiSliderValue.textContent = '5';
+  els.aiSliderWarning.classList.add('hidden');
+  els.aiSliderModal.classList.remove('hidden');
+
+  try {
+    const stats = await api('/api/athlete-stats');
+    const max = Math.max(1, stats.totalRides || 10);
+    els.aiActivitySlider.max = max;
+    // Keep current value in range
+    if (parseInt(els.aiActivitySlider.value) > max) {
+      els.aiActivitySlider.value = max;
+      els.aiSliderValue.textContent = max;
+    }
+  } catch {
+    // Fallback — leave slider max at a reasonable default
+    els.aiActivitySlider.max = 50;
+  }
+}
+
+// ─── AI Analysis ────────────────────────────────────────────────────────────
+
+async function runAiAnalysis(count = 10) {
+  els.aiAnalysisModal.classList.remove('hidden');
+  els.aiAnalysisLoading.classList.remove('hidden');
+  els.aiAnalysisResults.classList.add('hidden');
+  els.aiAnalysisError.classList.add('hidden');
+
+  // Update loading text to reflect chosen count
+  const loadingSpan = els.aiAnalysisLoading.querySelector('span');
+  if (loadingSpan) loadingSpan.textContent = `Analysing your last ${count} ride${count > 1 ? 's' : ''}...`;
+
+  // Reset and show progress bar
+  els.aiProgress.classList.remove('hidden');
+  els.aiProgressFill.style.width = '0%';
+  els.aiProgressText.textContent = 'Fetching activity list...';
+
+  const evtSource = new EventSource(`/api/ai-analysis?count=${encodeURIComponent(count)}`);
+
+  evtSource.addEventListener('progress', (e) => {
+    const data = JSON.parse(e.data);
+    const pct = data.total > 0 ? (data.downloaded / data.total) * 100 : 0;
+    els.aiProgressFill.style.width = `${pct}%`;
+    if (data.phase) {
+      els.aiProgressText.textContent = data.phase;
+    } else {
+      els.aiProgressText.textContent = `Downloaded ${data.downloaded} of ${data.total}${data.ride ? ' — ' + data.ride : ''}`;
+    }
+  });
+
+  evtSource.addEventListener('result', (e) => {
+    evtSource.close();
+    const result = JSON.parse(e.data);
+
+    if (result.error) {
+      els.aiAnalysisLoading.classList.add('hidden');
+      els.aiAnalysisError.classList.remove('hidden');
+      els.aiErrorText.textContent = result.error;
+      return;
+    }
+
+    els.aiAnalysisLoading.classList.add('hidden');
+    els.aiAnalysisResults.classList.remove('hidden');
+    displayAiResults(result);
+  });
+
+  evtSource.addEventListener('error_event', (e) => {
+    evtSource.close();
+    const data = JSON.parse(e.data);
+    els.aiAnalysisLoading.classList.add('hidden');
+    els.aiAnalysisError.classList.remove('hidden');
+    els.aiErrorText.textContent = data.error || 'Failed to run analysis.';
+  });
+
+  evtSource.onerror = () => {
+    evtSource.close();
+    els.aiAnalysisLoading.classList.add('hidden');
+    els.aiAnalysisError.classList.remove('hidden');
+    els.aiErrorText.textContent = 'Connection lost. Please try again.';
+  };
+}
+
+function displayAiResults(result) {
+  // Rating display
+  const stars = '★'.repeat(result.rating) + '☆'.repeat(5 - result.rating);
+  els.aiRating.innerHTML = `
+    <div class="ai-rating-stars">${stars}</div>
+    <div class="ai-rating-label">${result.rating}/5 — Overall Shifting Score</div>
+    <div class="ai-rating-percent">${result.overallPercent}% efficiency across ${result.analysedCount} ride${result.analysedCount > 1 ? 's' : ''}</div>
+  `;
+
+  // Component bars
+  const comps = result.components;
+  els.aiComponents.innerHTML = `
+    <div class="ai-comp">
+      <span class="ai-comp-label">Cadence Efficiency</span>
+      <div class="ai-comp-bar"><div class="ai-comp-fill" style="width:${comps.cadence}%; background: #22c55e"></div></div>
+      <span class="ai-comp-pct">${comps.cadence}%</span>
+    </div>
+    <div class="ai-comp">
+      <span class="ai-comp-label">Cross-Chain Avoidance</span>
+      <div class="ai-comp-bar"><div class="ai-comp-fill" style="width:${comps.crossChain}%; background: #3b82f6"></div></div>
+      <span class="ai-comp-pct">${comps.crossChain}%</span>
+    </div>
+    <div class="ai-comp">
+      <span class="ai-comp-label">Gradient Matching</span>
+      <div class="ai-comp-bar"><div class="ai-comp-fill" style="width:${comps.gradient}%; background: #f59e0b"></div></div>
+      <span class="ai-comp-pct">${comps.gradient}%</span>
+    </div>
+    <div class="ai-comp">
+      <span class="ai-comp-label">Shift Smoothness</span>
+      <div class="ai-comp-bar"><div class="ai-comp-fill" style="width:${comps.hunting}%; background: #8b5cf6"></div></div>
+      <span class="ai-comp-pct">${comps.hunting}%</span>
+    </div>
+  `;
+
+  // Summary text
+  els.aiSummary.textContent = result.summary;
+
+  // Score-over-time chart
+  renderAiScoreChart(result.activities);
+
+  // Per-activity breakdown
+  if (result.activities?.length) {
+    els.aiActivities.innerHTML = `
+      <h4>Per-Ride Breakdown</h4>
+      <table class="ai-activities-table">
+        <thead><tr><th>Ride</th><th>Date</th><th>Score</th></tr></thead>
+        <tbody>
+          ${result.activities.map(a => `
+            <tr>
+              <td>${escapeHtml(a.name)}</td>
+              <td>${new Date(a.date).toLocaleDateString('en-GB', { day:'numeric', month:'short' })}</td>
+              <td>${'★'.repeat(a.rating)}${'☆'.repeat(5 - a.rating)} (${a.overall}%)</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+}
+
+// ─── AI Score-Over-Time Chart ───────────────────────────────────────────────
+
+let aiScoreChartInstance = null;
+
+function renderAiScoreChart(activities) {
+  if (!activities || activities.length < 2) {
+    els.aiScoreChart.classList.add('hidden');
+    return;
+  }
+
+  els.aiScoreChart.classList.remove('hidden');
+
+  // Sort chronologically (oldest first)
+  const sorted = [...activities].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  const labels = sorted.map(a =>
+    new Date(a.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  );
+
+  const mkDataset = (label, key, color, fill = false) => ({
+    label,
+    data: sorted.map(a => parseInt(a[key])),
+    borderColor: color,
+    backgroundColor: fill ? color.replace(')', ', 0.10)').replace('rgb', 'rgba') : 'transparent',
+    fill,
+    tension: 0.35,
+    pointRadius: 3,
+    pointBackgroundColor: color,
+    pointBorderWidth: 0,
+    pointHoverRadius: 5,
+    borderWidth: fill ? 2.5 : 1.5,
+    borderDash: fill ? [] : [4, 3]
+  });
+
+  // Destroy previous instance if it exists
+  if (aiScoreChartInstance) {
+    aiScoreChartInstance.destroy();
+    aiScoreChartInstance = null;
+  }
+
+  const ctx = els.aiScoreCanvas.getContext('2d');
+  aiScoreChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        mkDataset('Overall Score',       'overall',    'rgb(59, 130, 246)',  true),
+        mkDataset('Cadence Efficiency',   'cadence',    'rgb(34, 197, 94)'),
+        mkDataset('Cross-Chain Avoidance','crossChain', 'rgb(99, 102, 241)'),
+        mkDataset('Gradient Matching',    'gradient',   'rgb(245, 158, 11)'),
+        mkDataset('Shift Smoothness',     'hunting',    'rgb(139, 92, 246)')
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        y: {
+          min: 0,
+          max: 100,
+          ticks: {
+            callback: v => v + '%',
+            color: 'rgba(255,255,255,0.5)',
+            font: { size: 11 }
+          },
+          grid: { color: 'rgba(255,255,255,0.06)' }
+        },
+        x: {
+          ticks: {
+            color: 'rgba(255,255,255,0.5)',
+            font: { size: 11 },
+            maxRotation: 45
+          },
+          grid: { display: false }
+        }
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'bottom',
+          labels: {
+            color: 'rgba(255,255,255,0.7)',
+            font: { size: 11 },
+            boxWidth: 14,
+            padding: 12,
+            usePointStyle: true,
+            pointStyle: 'line'
+          }
+        },
+        tooltip: {
+          callbacks: {
+            title: (items) => sorted[items[0].dataIndex]?.name || items[0].label,
+            label: (item) => `${item.dataset.label}: ${item.raw}%`
+          }
+        }
+      }
+    }
+  });
+}
+
+async function loadOptimalGears() {
+  const streams = state.streams;
+  if (!streams?.cadence || !streams?.velocity_smooth) return;
+
+  try {
+    const result = await api('/api/optimal-gears', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cadence: streams.cadence,
+        velocity_smooth: streams.velocity_smooth,
+        grade_smooth: streams.grade_smooth,
+        distance: streams.distance
+      })
+    });
+    state.optimalGears = result.optimalGears;
+  } catch (err) {
+    console.error('Failed to load optimal gears:', err);
+  }
 }
 
 // ─── Auto-Match Di2 Data from FIT Library ───────────────────────────────────

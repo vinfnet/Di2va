@@ -1,5 +1,7 @@
 # Di2va
 
+> **Why does this exist?** Gear-shifting data has been a long-standing feature request in the Strava community — cyclists with electronic groupsets (Shimano Di2, SRAM AXS, Campagnolo EPS) upload FIT files that contain every shift event, yet Strava doesn't surface any of it. The request didn't seem to be moving, so I built my own tool. You may find it useful or, at the very least, interesting.
+
 **Visualize your Shimano Di2 electronic gear shift data from Strava cycling activities** — see exactly what gear you were in at every point on a map and elevation profile, with interactive gear statistics and a drivetrain visualization.
 
 ![screenshot](https://img.shields.io/badge/status-development-orange)
@@ -11,6 +13,10 @@
 ![Di2va elevation analysis](docs/screenshots/di2va-elevation-analysis.png)
 
 *Detailed elevation analysis — zoom in to compare elevation against cadence (green) with gear shift markers (▲ upshift, ▼ downshift). Hover over any point to see gear, speed, cadence, power, and gradient.*
+
+![Di2va AI Shifting Analysis](docs/screenshots/di2va-ai-analysis.png)
+
+*AI Shifting Analysis — scores your shifting quality across your last 10 rides with a 1–5 star rating, component breakdown, per-ride table, and actionable text feedback. See the [full AI Analysis documentation](docs/AI_ANALYSIS.md) for how the scoring works.*
 
 ## Why?
 
@@ -36,11 +42,13 @@ I was inspired by **[Di2Stats.com](https://di2stats.com)** — a great service t
 - **Interactive Gear Popup** — Click any gear to see an animated SVG drivetrain visualization with the full Dura-Ace 9200 cassette and chainrings
 - **Arrow Key Gear Cycling** — Use left/right arrow keys to step through all gears used in the ride, or click the nav bar chips
 - **Interactive Hover** — Hover over the elevation chart to see gear, speed, cadence, power, and gradient at any point; synced with map marker
+- **AI Shifting Analysis** — Scores your shifting across your last 10 rides on cadence efficiency, gradient matching, cross-chain avoidance, and shift smoothness ([details](docs/AI_ANALYSIS.md))
+- **Optimal Gear Overlay** — Toggle a dashed gold line on the elevation chart showing the recommended gear ratio at each point
 - **Units Switcher** — Toggle between metric and imperial
 
 ## Data Privacy
 
-**All data processing happens on your local machine.** Di2va is a local web app running at `localhost:3000`. The only network traffic is between your machine and Strava's API (to fetch your activity data) and CARTO's tile CDN (for map tiles). No data is sent to any other third-party service. See the [setup guide](docs/SETUP_GUIDE.md) for a full data flow diagram.
+**All data processing happens on your local machine.** Di2va is a local web app running at `localhost:3000`. The only network traffic is between your machine and Strava's API (to fetch your activity data) and CARTO's tile CDN (for map tiles). No data is sent to any other third-party service — including the AI Shifting Analysis, which is a local rules engine, not a cloud AI service. See the [setup guide](docs/SETUP_GUIDE.md) for a full data flow diagram and the [AI analysis docs](docs/AI_ANALYSIS.md) for details on where analysis data goes.
 
 ## Prerequisites
 

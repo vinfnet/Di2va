@@ -84,6 +84,11 @@
           </svg>
           Connect with Strava
         </a>
+        <div class="login-privacy-note">
+          <h4>🔒 Why do I need to log in?</h4>
+          <p>Di2va needs read-only access to your Strava activities to fetch ride data, GPS streams, cadence, and power — the inputs it uses to analyse your shifting. <strong>All processing happens entirely on your own computer.</strong> Your .FIT files are parsed locally, nothing is sent to any third-party service, and your Strava credentials never leave your machine.</p>
+          <p>For full details on how your data is handled, see the <a href="docs/SETUP_GUIDE.md" target="_blank">Setup Guide — Data Processing &amp; Privacy</a>.</p>
+        </div>
       </div>
     </section>
 
@@ -106,10 +111,18 @@
             Upload FIT File
           </button>
           <input type="file" id="fit-file-input" accept=".fit" class="hidden">
+          <button id="btn-ai-analysis" class="btn btn-accent">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M12 2a4 4 0 014 4c0 1.1-.9 2-2 2h-4a2 2 0 01-2-2 4 4 0 014-4zm-3 8h6l1 10H8l1-10z"/>
+              <circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/>
+            </svg>
+            AI Analysis
+          </button>
           <button id="btn-load-more" class="btn btn-outline">Load More</button>
         </div>
       </div>
       <div id="fit-library-banner" class="fit-library-banner hidden"></div>
+      <p class="activities-hint">Select a ride to see its detailed gear analysis — map, elevation profile, and shift statistics.</p>
       <div id="activities-list"></div>
       <div id="activities-loading" class="loading hidden">
         <div class="spinner"></div>
@@ -199,6 +212,10 @@
               <input type="checkbox" id="toggle-cadence">
               <span>Show cadence</span>
             </label>
+            <label class="toggle-label">
+              <input type="checkbox" id="toggle-optimal-gear">
+              <span>Show optimal gear</span>
+            </label>
             <button id="btn-reset-zoom" class="btn btn-sm btn-outline hidden" title="Reset zoom">Reset Zoom</button>
             <button id="btn-fullscreen-elevation" class="btn-fullscreen" title="Toggle fullscreen">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -268,6 +285,68 @@
         <div id="gear-popup-info" class="gear-popup-info"></div>
         <div id="gear-popup-nav" class="gear-popup-nav"></div>
         <div class="gear-popup-hint">← → arrow keys to change gear</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Activity Count Slider Modal -->
+  <div id="ai-slider-modal" class="modal-overlay hidden">
+    <div class="modal-card ai-slider-card">
+      <div class="modal-header">
+        <h3>🤖 AI Shifting Analysis</h3>
+        <button id="btn-close-ai-slider" class="btn btn-sm btn-outline">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="ai-slider-desc">How many recent rides would you like to analyse?</p>
+        <div class="ai-slider-row">
+          <input type="range" id="ai-activity-slider" min="1" max="10" value="5" class="ai-slider">
+          <span id="ai-slider-value" class="ai-slider-value">5</span>
+        </div>
+        <div id="ai-slider-warning" class="ai-slider-warning hidden">
+          ⚠️ Analysing more than 10 rides will take longer and will download multiple temporary .FIT files.
+        </div>
+        <div class="ai-slider-actions">
+          <button id="btn-run-ai-analysis" class="btn btn-accent">Analyse</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Analysis Modal -->
+  <div id="ai-analysis-modal" class="modal-overlay hidden">
+    <div class="modal-card ai-analysis-card">
+      <div class="modal-header">
+        <h3>🤖 AI Shifting Analysis</h3>
+        <button id="btn-close-ai-analysis" class="btn btn-sm btn-outline">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="ai-analysis-loading" class="ai-loading">
+          <div class="spinner"></div>
+          <span>Analysing your last 10 rides...</span>
+          <div id="ai-progress" class="ai-progress hidden">
+            <div class="ai-progress-bar"><div id="ai-progress-fill" class="ai-progress-fill"></div></div>
+            <span id="ai-progress-text" class="ai-progress-text">Downloaded 0 of 0</span>
+          </div>
+          <p class="ai-loading-hint">This fetches data from Strava for each ride — it may take a moment.</p>
+        </div>
+        <div id="ai-analysis-results" class="hidden">
+          <div id="ai-rating" class="ai-rating"></div>
+          <p class="ai-score-hint">Scores are percentages — higher is better. 100% means perfect shifting across that criterion.</p>
+          <div id="ai-components" class="ai-components"></div>
+          <div id="ai-score-chart" class="ai-score-chart-wrap hidden">
+            <h4>Score Over Time</h4>
+            <canvas id="ai-score-canvas"></canvas>
+          </div>
+          <pre id="ai-summary" class="ai-summary"></pre>
+          <div id="ai-activities" class="ai-activities"></div>
+          <div class="ai-method-note">
+            <p><strong>How does this work?</strong> This analysis uses a deterministic, rules-based scoring engine — not a machine-learning model. It evaluates your shifting against established cycling best-practices (cadence range, cross-chain avoidance, gradient matching, shift smoothness) using data from the Strava API. We are investigating LLM-based approaches for richer, personalised feedback in a future release.</p>
+            <p>For full details of the scoring methodology, see the <a href="docs/AI_ANALYSIS.md" target="_blank">AI Analysis documentation</a>.</p>
+          </div>
+        </div>
+        <div id="ai-analysis-error" class="hidden">
+          <p id="ai-error-text" class="ai-error-text"></p>
+        </div>
       </div>
     </div>
   </div>
