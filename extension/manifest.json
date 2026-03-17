@@ -1,0 +1,64 @@
+{
+  "manifest_version": 3,
+  "name": "Di2va — Shimano Di2 Gear Overlay for Strava",
+  "short_name": "Di2va",
+  "version": "0.1.0",
+  "description": "Visualize Shimano Di2 electronic gear shifts on Strava activity pages — gear-colored routes, elevation profiles, shift analysis and more.",
+  "author": "vINF",
+
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+
+  "host_permissions": [
+    "https://www.strava.com/*"
+  ],
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    },
+    "default_title": "Di2va",
+    "default_popup": "popup/popup.html"
+  },
+
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+
+  "background": {
+    "scripts": ["background.js"]
+  },
+
+  "content_scripts": [
+    {
+      "run_at": "document_idle",
+      "matches": ["https://www.strava.com/activities/*"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "matches": ["https://www.strava.com/*"],
+      "resources": ["fit-worker.js", "icons/*"]
+    }
+  ],
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "di2va@vinf.net",
+      "strict_min_version": "128.0"
+    }
+  }
+}
