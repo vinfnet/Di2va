@@ -82,14 +82,58 @@ All of the above analysis, plus:
 
 ## Data Privacy
 
-**All data processing happens on your local machine.** Di2va is a local web app running at `localhost:3000`. The only network traffic is between your machine and Strava's API (to fetch your activity data) and CARTO's tile CDN (for map tiles). No data is sent to any other third-party service — including the AI Shifting Analysis, which is a local rules engine, not a cloud AI service. See the [setup guide](docs/SETUP_GUIDE.md) for a full data flow diagram and the [AI analysis docs](docs/AI_ANALYSIS.md) for details on where analysis data goes.
+**All data processing happens locally in your browser.** The extension communicates only with Strava's own servers (to fetch your activity data) using your existing session. No data is sent to any third-party service — including the Shifting Analysis, which is a local rules engine, not a cloud AI service.
 
-## Prerequisites
+The standalone web app adds CARTO tile CDN traffic for map tiles. See the [setup guide](docs/SETUP_GUIDE.md) for a full data flow diagram and the [AI analysis docs](docs/AI_ANALYSIS.md) for details.
+
+## Browser Extension
+
+The browser extension injects Di2va directly into Strava activity pages — no separate web app, no OAuth setup. It uses your existing Strava session to fetch streams and FIT data.
+
+### Firefox (Recommended)
+
+**[Install Di2va from Firefox Add-ons](https://addons.mozilla.org/firefox/addon/di2va/)** — one click, auto-updates.
+
+Requires Firefox 140+.
+
+### Chrome
+
+Chrome support is built in (MV3 manifest) but is not yet published on the Chrome Web Store. To use it:
+
+```bash
+git clone https://github.com/vinfnet/Di2va.git
+cd Di2va/extension
+npm install
+npm run build
+```
+
+1. Open `chrome://extensions/`
+2. Enable **Developer mode** (top-right toggle)
+3. Click **Load unpacked**
+4. Select the `extension/dist/` folder
+5. Navigate to any Strava activity page — Di2va appears below the map
+
+### How It Works
+
+- The content script runs on `https://www.strava.com/activities/*`
+- It extracts the activity ID from the URL and fetches stream data using Strava's internal API endpoints (authenticated via your session cookies)
+- It attempts to download the original FIT file from Strava's export endpoint for actual Di2 gear shift data
+- If no FIT file is available, gears are estimated from cadence + speed
+- A collapsible panel is injected below the Strava map with the elevation chart, gear analysis, drivetrain animation, and shifting analysis
+
+---
+
+<details>
+<summary><h2>Advanced: Standalone Web App & Development</h2></summary>
+
+The standalone web app is the original Di2va interface. It requires Strava OAuth credentials but provides a full activity browser with map overlay and route coloring.
+
+![Di2va ride overview](docs/screenshots/di2va-ride-overview.png)
+
+### Prerequisites
 
 - **Node.js** 18+ and npm
 - A **Strava API Application** (free)
-
-## Setup
 
 ### 1. Create a Strava API App
 
@@ -102,7 +146,7 @@ All of the above analysis, plus:
 
 ### 2. Configure Environment
 
-On first run the application will prompt to connect to your Strava account and store the API keys on your device - ensure the .env file is secure - it contains credentials to your Strava account.
+On first run the application will prompt to connect to your Strava account and store the API keys on your device — ensure the .env file is secure, it contains credentials to your Strava account.
 
 ```bash
 cp .env.example .env
@@ -133,38 +177,10 @@ npm run dev
 
 Uses `nodemon` for auto-restart on file changes.
 
-## Browser Extension
-
-The browser extension injects Di2va directly into Strava activity pages — no separate web app, no OAuth setup. It uses your existing Strava session to fetch streams and FIT data.
-
-### Firefox (Recommended)
-
-**[Install Di2va from Firefox Add-ons](https://addons.mozilla.org/firefox/addon/di2va/)** — one click, auto-updates.
-
-Requires Firefox 140+.
-
-### Chrome
-
-Chrome support is built in (MV3 manifest) but is not yet published on the Chrome Web Store. To use it:
+### Building the Extension from Source
 
 ```bash
-git clone https://github.com/vinfnet/Di2va.git
-cd Di2va/extension
-npm install
-npm run build
-```
-
-1. Open `chrome://extensions/`
-2. Enable **Developer mode** (top-right toggle)
-3. Click **Load unpacked**
-4. Select the `extension/dist/` folder
-5. Navigate to any Strava activity page — Di2va appears below the map
-
-### Building from Source
-
-```bash
-git clone https://github.com/vinfnet/Di2va.git
-cd Di2va/extension
+cd extension
 npm install
 npm run build          # Production build → dist/
 npm run build:dev      # Development build with source maps
@@ -172,17 +188,55 @@ npm run watch          # Auto-rebuild on changes
 npm run package:firefox  # Build + create Firefox .zip
 ```
 
-> Inspired by [Sauce for Strava](https://www.sauce.llc/) — an excellent browser extension that enhances Strava with advanced analytics. Di2va takes a similar approach but focuses specifically on Di2 electronic gear shift data.
+### How It Works
 
-### How It Works (Extension)
+#### Data Sources
 
-- The content script runs on `https://www.strava.com/activities/*`
-- It extracts the activity ID from the URL and fetches stream data using Strava's internal API endpoints (authenticated via your session cookies)
-- It attempts to download the original FIT file from Strava's export endpoint for actual Di2 gear shift data
-- If no FIT file is available, gears are estimated from cadence + speed
-- A collapsible panel is injected below the Strava map with the elevation chart, gear analysis, drivetrain animation, and shifting analysis
+1. **Strava API Streams** — GPS coordinates, elevation, cadence, speed, power, gradient
+2. **Gear Estimation** — Uses cadence and speed to mathematically estimate which gear combination is in use (assumes standard road bike gearing)
+3. **FIT File Upload** — For actual Di2 data, upload the `.FIT` file from your bike computer (e.g. Garmin, Wahoo). This contains the real gear change events recorded by the Di2 system
 
-### Extension Architecture
+#### Gear Estimation Algorithm
+
+When no FIT file is available, the app estimates gears using:
+
+```
+gear_ratio = speed / (cadence × wheel_circumference)
+```
+
+It then matches this against known chainring/cassette combinations:
+- **Chainrings**: 34/50 (compact) or 39/53 (standard)
+- **Cassette**: 11-28 (11-speed)
+
+The confidence of each estimate is classified as high/medium/low based on how close the match is.
+
+#### Color Scheme
+
+Gears are colored from **red (easiest)** → **blue/purple (hardest)** based on the rear cassette position:
+- 🔴 Large cog (easier gears) — warm colors
+- 🔵 Small cog (harder gears) — cool colors
+
+### Architecture
+
+```
+di2va/
+├── LICENSE                # MIT License
+├── server.js              # Express server, Strava OAuth, API proxy, FIT parser
+├── .env                   # Environment variables (not in git)
+├── .env.example           # Template for .env
+├── package.json
+├── public/
+│   ├── index.html         # Single-page app shell
+│   ├── styles.css         # Dark theme UI
+│   └── app.js             # Frontend: map, chart, gear logic
+└── extension/             # Browser extension (Firefox + Chrome)
+    ├── manifest.json      # MV3 WebExtension manifest
+    ├── webpack.config.js  # Build config
+    ├── src/               # Source modules
+    └── dist/              # Built output (load in browser)
+```
+
+#### Extension Architecture
 
 ```
 extension/
@@ -208,74 +262,20 @@ extension/
 └── dist/                      # Built output (load this in browser)
 ```
 
----
-
-## Standalone Web App
-
-> The standalone web app is the original Di2va interface. It requires Strava OAuth credentials but provides a full activity browser with map overlay.
-
-## How It Works
-
-### Data Sources
-
-1. **Strava API Streams** — GPS coordinates, elevation, cadence, speed, power, gradient
-2. **Gear Estimation** — Uses cadence and speed to mathematically estimate which gear combination is in use (assumes standard road bike gearing)
-3. **FIT File Upload** — For actual Di2 data, upload the `.FIT` file from your bike computer (e.g. Garmin, Wahoo). This contains the real gear change events recorded by the Di2 system
-
-### Gear Estimation Algorithm
-
-When no FIT file is available, the app estimates gears using:
-
-```
-gear_ratio = speed / (cadence × wheel_circumference)
-```
-
-It then matches this against known chainring/cassette combinations:
-- **Chainrings**: 34/50 (compact) or 39/53 (standard)
-- **Cassette**: 11-28 (11-speed)
-
-The confidence of each estimate is classified as high/medium/low based on how close the match is.
-
-### Color Scheme
-
-Gears are colored from **red (easiest)** → **blue/purple (hardest)** based on the rear cassette position:
-- 🔴 Large cog (easier gears) — warm colors
-- 🔵 Small cog (harder gears) — cool colors
-
-## Architecture
-
-```
-di2va/
-├── LICENSE                # MIT License
-├── server.js              # Express server, Strava OAuth, API proxy, FIT parser
-├── .env                   # Environment variables (not in git)
-├── .env.example           # Template for .env
-├── package.json
-├── public/
-│   ├── index.html         # Single-page app shell
-│   ├── styles.css         # Dark theme UI
-│   └── app.js             # Frontend: map, chart, gear logic
-└── extension/             # Browser extension (Firefox + Chrome)
-    ├── manifest.json      # MV3 WebExtension manifest
-    ├── webpack.config.js  # Build config
-    ├── src/               # Source modules
-    └── dist/              # Built output (load in browser)
-```
-
 ### Tech Stack
 
 - **Backend**: Node.js, Express, express-session, axios, multer, fit-file-parser
 - **Frontend**: Vanilla JS (no framework), Leaflet.js (maps), Chart.js (elevation), CARTO dark tiles
 - **APIs**: Strava V3 API
 
-## Customizing Gearing
+### Customizing Gearing
 
 If your bike uses different gearing (e.g. 1x, different cassette), edit the constants in:
 
 - `server.js` → `POST /api/estimate-gears` — `CHAINRINGS` and `CASSETTE` arrays
 - `public/app.js` → `getGearColor()` — `CASSETTE` reference array
 
-## Troubleshooting
+### Troubleshooting
 
 | Issue | Solution |
 |-------|---------|
@@ -283,6 +283,10 @@ If your bike uses different gearing (e.g. 1x, different cassette), edit the cons
 | No gear data shown | Upload a `.FIT` file, or ensure the activity has cadence data for estimation |
 | FIT file parsing fails | Ensure the file is a valid `.FIT` file from a compatible device |
 | Activities not loading | Check that the Strava API scope includes `activity:read_all` |
+
+</details>
+
+> Inspired by [Sauce for Strava](https://www.sauce.llc/) — an excellent browser extension that enhances Strava with advanced analytics. Di2va takes a similar approach but focuses specifically on Di2 electronic gear shift data.
 
 ## License
 
