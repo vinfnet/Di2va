@@ -2,11 +2,14 @@
   "name": "di2va-extension",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "Di2va browser extension — Shimano Di2 gear overlay for Strava",
   "scripts": {
     "build": "webpack --mode production",
     "build:dev": "webpack --mode development",
-    "watch": "webpack --mode development --watch"
+    "watch": "webpack --mode development --watch",
+    "package:firefox": "webpack --mode production && cd dist && zip -r ../di2va-firefox-v$npm_package_version.zip . -x '*.DS_Store'",
+    "package:source": "cd .. && zip -r extension/di2va-source-v$npm_package_version.zip extension/src extension/popup extension/options extension/icons extension/manifest.json extension/webpack.config.js extension/package.json extension/package-lock.json -x '*.DS_Store'"
   },
   "devDependencies": {
     "copy-webpack-plugin": "^12.0.2",

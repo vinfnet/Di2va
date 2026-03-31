@@ -2,6 +2,7 @@
   "name": "di2va",
   "version": "1.0.0",
   "description": "Di2va — Visualize Shimano Di2 gear shift data from Strava on maps and elevation profiles",
+  "license": "MIT",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

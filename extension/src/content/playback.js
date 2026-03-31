@@ -9,6 +9,7 @@ import { getGearColor } from '../gear-colors.js';
 import { renderDrivetrainSVG, updateDrivetrainRotation } from './drivetrain.js';
 import { distFromMetres, speedFromMs, elevFromMetres, distUnit, speedUnit, elevUnit } from './units.js';
 import { isCrossChained, optimalGearForConditions, buildGearTable } from '../shift-analyzer.js';
+import { safeSetHTML } from './safe-html.js';
 
 // ─── State ──────────────────────────────────────────────────────────────
 
@@ -331,7 +332,7 @@ function updateReplayStats(panel, index, streams, gear) {
     ? `<span style="color:${getGearColor(gear)}">${gear.front}×${gear.rear}</span>`
     : '—';
 
-  el.innerHTML = `
+  safeSetHTML(el, `
     <span class="di2va-rs-item">${gearText}</span>
     <span class="di2va-rs-item">${dist != null ? `${distFromMetres(dist).toFixed(2)} ${distUnit()}` : '—'}</span>
     <span class="di2va-rs-item">${elev != null ? `${elevFromMetres(elev).toFixed(0)} ${elevUnit()}` : '—'}</span>
@@ -339,7 +340,7 @@ function updateReplayStats(panel, index, streams, gear) {
     <span class="di2va-rs-item">${speed != null ? `${speedFromMs(speed).toFixed(1)} ${speedUnit()}` : '—'}</span>
     <span class="di2va-rs-item">${cad != null ? `${cad} rpm` : '—'}</span>
     <span class="di2va-rs-item">${power != null ? `${power} W` : '—'}</span>
-  `;
+  `);
 }
 
 /**
@@ -429,7 +430,7 @@ function updateReplayAI(panel, index, streams, gear) {
       <span class="di2va-ai-label">Status</span>
       <span class="di2va-ai-detail">Waiting for data…</span>
     </div>`;
-    rowsEl.innerHTML = rows;
+    safeSetHTML(rowsEl, rows);
     if (sugEl) sugEl.innerHTML = '';
     return;
   }
@@ -480,7 +481,7 @@ function updateReplayAI(panel, index, streams, gear) {
     </div>`;
   }
 
-  rowsEl.innerHTML = rows;
+  safeSetHTML(rowsEl, rows);
 
   // Suggestion
   if (sugEl) {
@@ -499,7 +500,7 @@ function updateReplayAI(panel, index, streams, gear) {
       else targetCad = '~92';
       suggestion += ` at ${targetCad} rpm`;
       if (crossChained) suggestion += ' (avoids cross-chain)';
-      sugEl.innerHTML = `<span class="di2va-ai-suggest">💡 ${suggestion}</span>`;
+      safeSetHTML(sugEl, `<span class="di2va-ai-suggest">💡 ${suggestion}</span>`);
     } else {
       sugEl.innerHTML = '';
     }
