@@ -29,6 +29,12 @@ The extension injects Di2va directly into Strava activity pages — no separate 
 - **Unit Detection** — Reads your Strava unit preferences (metric/imperial)
 - **Firefox & Chrome** — MV3 WebExtension compatible with both browsers
 
+### Install from Firefox Add-ons (Recommended)
+
+[![Install Di2va for Firefox](https://img.shields.io/badge/Firefox-Install_Di2va-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/gearshift-overlay-for-strava)
+
+One click, auto-updates included. Requires Firefox 140+.
+
 ### Install Manually (Firefox)
 
 1. Clone and build the extension:
