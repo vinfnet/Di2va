@@ -216,7 +216,7 @@ export function renderDrivetrainSVG(container, chainrings, cassette, activeFront
     `font-family="system-ui,sans-serif" text-anchor="middle">Ratio ${ratio}</text>`;
 
   svg += `</svg>`;
-  container.innerHTML = svg;
+  container.replaceChildren(new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement);
 }
 
 /**

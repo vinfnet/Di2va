@@ -12,6 +12,7 @@ import { getGearColor, formatGear, GEAR_COLORS } from '../gear-colors.js';
 import { renderElevationChart } from './elevation-chart.js';
 import { injectUnitDetector, detectUnits, distFromMetres, distUnit } from './units.js';
 import { initReplay, updateDrivetrainOnHover, replayPosPlugin, syncReplayToZoom } from './playback.js';
+import { safeSetHTML } from './safe-html.js';
 
 // ─── Unit Detection (must happen early, before DOM is fully parsed) ─────────────
 
@@ -309,7 +310,7 @@ function renderScore(container, analysis) {
 
   const stars = '★'.repeat(analysis.rating) + '☆'.repeat(5 - analysis.rating);
 
-  container.innerHTML = `
+  safeSetHTML(container, `
     <div class="di2va-score-header">
       <span class="di2va-stars">${stars}</span>
       <span class="di2va-overall">${analysis.overall}%</span>
@@ -325,7 +326,7 @@ function renderScore(container, analysis) {
         </div>
       `).join('')}
     </div>
-  `;
+  `);
 }
 
 function getBarColor(score) {
@@ -376,7 +377,7 @@ function renderGearStats(container, gears, streams) {
 
   const isEstimated = gears.some(g => g?.estimated);
 
-  container.innerHTML = `
+  safeSetHTML(container, `
     <div class="di2va-stats-header">
       <span>Gear Usage</span>
       <span class="di2va-shift-count">${shiftCount} shifts${isEstimated ? ' (estimated)' : ''}</span>
@@ -392,22 +393,22 @@ function renderGearStats(container, gears, streams) {
         </div>
       `).join('')}
     </div>
-  `;
+  `);
 }
 
 function renderLegend(container) {
-  container.innerHTML = `
+  safeSetHTML(container, `
     <div class="di2va-legend-row">
       ${GEAR_COLORS.map((c, i) => `<span class="di2va-legend-dot" style="background:${c}" title="Gear ${i + 1}"></span>`).join('')}
       <span class="di2va-legend-labels"><span>Easy</span><span>Hard</span></span>
     </div>
-  `;
+  `);
 }
 
 function renderSourceInfo(container, source) {
   const icon = source === 'fit' ? '📁' : '📊';
   const label = source === 'fit' ? 'FIT file (actual Di2 data)' : 'Estimated from cadence & speed';
-  container.innerHTML = `<span class="di2va-source">${icon} ${label}</span>`;
+  safeSetHTML(container, `<span class="di2va-source">${icon} ${label}</span>`);
 }
 
 // ─── FIT File Drop Zone ─────────────────────────────────────────────────────
@@ -715,7 +716,7 @@ function handleZoomChange(panel, streams, gears, startIdx, endIdx) {
     }
 
     if (compEl) {
-      compEl.innerHTML = Object.entries(sectionAnalysis.components).map(([key, comp]) => `
+      safeSetHTML(compEl, Object.entries(sectionAnalysis.components).map(([key, comp]) => `
         <div class="di2va-ss-row">
           <span class="di2va-ss-label">${comp.label}</span>
           <div class="di2va-ss-bar-track">
@@ -723,7 +724,7 @@ function handleZoomChange(panel, streams, gears, startIdx, endIdx) {
           </div>
           <span class="di2va-ss-value">${comp.score}%</span>
         </div>
-      `).join('');
+      `).join(''));
     }
 
     scoresEl.style.display = '';
