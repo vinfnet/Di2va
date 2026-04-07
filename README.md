@@ -4,7 +4,7 @@
 
 **Visualize your Shimano Di2 electronic gear shift data on Strava** — see exactly what gear you were in at every point on the elevation profile, with interactive gear statistics, an animated drivetrain replay, and real-time shifting analysis.
 
-[![Install Di2va for Firefox](https://img.shields.io/badge/Firefox-Install_Di2va-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/firefox/addon/di2va/)
+[![Install Di2va for Firefox](https://img.shields.io/badge/Firefox-Install_Di2va-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/gearshift-overlay-for-strava)
 
 ![Di2va browser extension on a Strava activity page](docs/screenshots/di2va-browser-plugin.png)
 
@@ -12,7 +12,7 @@
 
 ## Firefox Browser Extension
 
-> **Now available on [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/di2va/)** — install with one click, auto-updates included.
+> **Now available on [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/gearshift-overlay-for-strava)** — install with one click, auto-updates included.
 
 The extension injects Di2va directly into Strava activity pages — no separate web app, no OAuth setup. It uses your existing Strava browser session to fetch streams and FIT data.
 
