@@ -13,6 +13,20 @@ import { DEFAULT_CHAINRINGS, DEFAULT_CASSETTE } from './gear-estimator.js';
 
 const WHEEL_CIRC = 2.105;
 
+function normaliseTeeth(values, fallback) {
+  if (!Array.isArray(values) || !values.length) return [...fallback];
+  const parsed = values
+    .map(Number)
+    .filter(v => Number.isFinite(v) && v > 0);
+  return parsed.length ? [...new Set(parsed)].sort((a, b) => a - b) : [...fallback];
+}
+
+function resolveDrivetrainConfig(config = {}) {
+  const chainrings = normaliseTeeth(config.chainrings, DEFAULT_CHAINRINGS);
+  const cassette = normaliseTeeth(config.cassette, DEFAULT_CASSETTE);
+  return { chainrings, cassette };
+}
+
 export function buildGearTable(chainrings = DEFAULT_CHAINRINGS, cassette = DEFAULT_CASSETTE) {
   const gears = [];
   for (const front of chainrings) {
@@ -39,7 +53,7 @@ export function isCrossChained(front, rear, chainrings = DEFAULT_CHAINRINGS, cas
 /**
  * For a given speed and gradient, find the optimal gear.
  */
-export function optimalGearForConditions(speed, gradient, gearTable) {
+export function optimalGearForConditions(speed, gradient, gearTable, chainrings = DEFAULT_CHAINRINGS, cassette = DEFAULT_CASSETTE) {
   if (speed < 0.5) return null;
 
   // Adjust target cadence based on gradient
@@ -58,7 +72,7 @@ export function optimalGearForConditions(speed, gradient, gearTable) {
 
   for (const g of gearTable) {
     const ratioDiff = Math.abs(g.ratio - idealRatio);
-    const crossPenalty = isCrossChained(g.front, g.rear) ? 0.3 : 0;
+    const crossPenalty = isCrossChained(g.front, g.rear, chainrings, cassette) ? 0.3 : 0;
     const score = ratioDiff + crossPenalty;
     if (score < bestScore) {
       bestScore = score;
@@ -75,8 +89,9 @@ export function optimalGearForConditions(speed, gradient, gearTable) {
  * @param {Array<{ front: number|null, rear: number|null }>} gearData — per-point gear info
  * @returns {{ rating: number, overall: string, components: object, stats: object, optimalGears: Array }|null}
  */
-export function analyseShifting(streams, gearData) {
-  const gearTable = buildGearTable();
+export function analyseShifting(streams, gearData, config = {}) {
+  const { chainrings, cassette } = resolveDrivetrainConfig(config);
+  const gearTable = buildGearTable(chainrings, cassette);
   const len = Math.min(
     streams.distance?.length || 0,
     streams.cadence?.length || 0,
@@ -100,7 +115,7 @@ export function analyseShifting(streams, gearData) {
     const gradient = streams.grade_smooth?.[i] || 0;
     const time = streams.time?.[i] || i;
 
-    const optimal = optimalGearForConditions(speed, gradient, gearTable);
+    const optimal = optimalGearForConditions(speed, gradient, gearTable, chainrings, cassette);
     optimalGears.push(optimal ? { front: optimal.front, rear: optimal.rear } : null);
 
     if (!g?.front || !g?.rear || speed < 0.5) continue;
@@ -116,7 +131,7 @@ export function analyseShifting(streams, gearData) {
     }
 
     // 2. Cross-chain check (15%)
-    if (isCrossChained(g.front, g.rear)) crossChainCount++;
+    if (isCrossChained(g.front, g.rear, chainrings, cassette)) crossChainCount++;
 
     // 3. Gradient matching (25%)
     if (optimal) {
@@ -178,15 +193,16 @@ export function analyseShifting(streams, gearData) {
 /**
  * Compute per-point optimal gears for an activity (for the overlay line).
  */
-export function computeOptimalGears(cadence, velocitySmooth, gradeSmooth) {
-  const gearTable = buildGearTable();
+export function computeOptimalGears(cadence, velocitySmooth, gradeSmooth, config = {}) {
+  const { chainrings, cassette } = resolveDrivetrainConfig(config);
+  const gearTable = buildGearTable(chainrings, cassette);
   const result = [];
   const len = cadence.length;
 
   for (let i = 0; i < len; i++) {
     const speed = velocitySmooth[i] || 0;
     const gradient = gradeSmooth?.[i] || 0;
-    const optimal = optimalGearForConditions(speed, gradient, gearTable);
+    const optimal = optimalGearForConditions(speed, gradient, gearTable, chainrings, cassette);
     result.push(optimal ? { front: optimal.front, rear: optimal.rear, ratio: +(optimal.front / optimal.rear).toFixed(2) } : null);
   }
 

@@ -27,7 +27,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Source
     const sourceEl = document.getElementById('source');
-    sourceEl.textContent = data.source === 'fit' ? 'FIT (Di2)' : 'Estimated';
+    sourceEl.textContent = data.source === 'fit'
+      ? `FIT (${data.groupset || 'Detected'})`
+      : 'Estimated';
     sourceEl.className = `source-badge source-${data.source}`;
 
     // Rating

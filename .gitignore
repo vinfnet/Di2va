@@ -12,6 +12,7 @@ package-lock.json
 
 # ─── Uploads & User Data ─────────────────────────────────────────
 uploads/
+dev-samples/
 *.fit
 
 # ─── OS Files ────────────────────────────────────────────────────
@@ -36,3 +37,4 @@ dist/
 build/
 .cache/
 *.zip
+extension/.di2va-build.json
