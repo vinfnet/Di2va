@@ -82,6 +82,8 @@ npm run build
 
 *Di2va in action on a Strava activity page (dark mode) — detected groupset and chainring/cassette range in the blue box, gear-usage cards, shift-quality score, gear-coloured elevation profile, and the playback controls (1× → 100×). The **Debug** button in the header toggles the floating bottom-left panel that hosts the **Override groupset** dropdown and **Re-analyse** button.*
 
+> **Tested groupsets:** Di2va has been successfully tested end-to-end with **Shimano Di2** and **SRAM AXS** FIT files. Campagnolo EPS and FSA WE detection logic is in place but has not yet been verified against real-world rides — feedback and sample FIT files welcome.
+
 When a FIT file is available, Di2va tries to identify the groupset (Shimano Di2, SRAM AXS, Campagnolo EPS, FSA WE) so the analysis uses sensible defaults. Detection is a weighted score combining two signals:
 
 1. **Device metadata in the FIT file** — manufacturer ID, `product_name` and `device_name` strings on `device_info` records are matched against vendor keywords (`shimano`, `di2`, `dura-ace`, `sram`, `axs`, `etap`, `campagnolo`, `eps`, `fsa we`, …). Strong matches (e.g. Shimano manufacturer ID `41`) score highest.
