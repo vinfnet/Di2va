@@ -158,6 +158,8 @@ npm run package:firefox  # Build + create Firefox .zip
 <details>
 <summary><h2>Advanced: Standalone Web App</h2></summary>
 
+> ⚠️ **Deprecated.** The standalone web app is no longer actively developed. All active development, bug fixes, and new features are happening in the **browser extension** only. The code is kept here for reference and for users who want a full-screen activity browser, but it may lag behind the extension in features and groupset support.
+
 The standalone web app is the original Di2va interface. It requires Strava OAuth credentials but provides a full activity browser with map overlay and route coloring. All the extension features are available here too, plus additional capabilities.
 
 ![Di2va ride overview](docs/screenshots/di2va-ride-overview.png)
