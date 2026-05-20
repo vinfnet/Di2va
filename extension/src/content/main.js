@@ -14,6 +14,24 @@ import { injectUnitDetector, detectUnits, distFromMetres, distUnit } from './uni
 import { initReplay, updateDrivetrainOnHover, replayPosPlugin, syncReplayToZoom } from './playback.js';
 import { safeSetHTML } from './safe-html.js';
 
+// ─── Common Groupset Presets ───────────────────────────────────────────────────
+
+const COMMON_GROUPSETS = [
+  { key: '__detected__', label: 'Detected from ride data' },
+  { key: 'shimano-2x11-50-34-11-28',  label: 'Shimano 2×11  50/34  11-28',   chainrings: [34, 50], cassette: [11,12,13,14,15,17,19,21,23,25,28] },
+  { key: 'shimano-2x11-50-34-11-32',  label: 'Shimano 2×11  50/34  11-32',   chainrings: [34, 50], cassette: [11,12,13,14,15,17,19,21,23,25,28,32].slice(0,11) },
+  { key: 'shimano-2x11-50-34-11-34',  label: 'Shimano 2×11  50/34  11-34',   chainrings: [34, 50], cassette: [11,13,15,17,19,21,23,25,27,30,34] },
+  { key: 'shimano-2x11-53-39-11-28',  label: 'Shimano 2×11  53/39  11-28',   chainrings: [39, 53], cassette: [11,12,13,14,15,17,19,21,23,25,28] },
+  { key: 'shimano-2x12-50-34-11-30',  label: 'Shimano 2×12  50/34  11-30',   chainrings: [34, 50], cassette: [11,12,13,14,15,16,17,19,21,24,27,30] },
+  { key: 'shimano-2x12-50-34-11-34',  label: 'Shimano 2×12  50/34  11-34',   chainrings: [34, 50], cassette: [11,12,13,14,15,17,19,21,24,27,30,34] },
+  { key: 'shimano-grx-1x11-40-11-42', label: 'Shimano GRX 1×11 40 × 11-42',  chainrings: [40],     cassette: [11,13,15,17,19,21,23,26,30,34,42] },
+  { key: 'sram-axs-2x12-48-35-10-28', label: 'SRAM AXS 2×12  48/35  10-28',  chainrings: [35, 48], cassette: [10,11,12,13,14,15,16,17,19,21,24,28] },
+  { key: 'sram-axs-2x12-48-35-10-33', label: 'SRAM AXS 2×12  48/35  10-33',  chainrings: [35, 48], cassette: [10,11,12,13,14,15,17,19,21,24,28,33] },
+  { key: 'sram-axs-2x12-46-33-10-36', label: 'SRAM AXS 2×12  46/33  10-36',  chainrings: [33, 46], cassette: [10,11,12,13,15,17,19,21,24,28,32,36] },
+  { key: 'sram-xplr-1x12-40-10-44',   label: 'SRAM XPLR 1×12 40 × 10-44',    chainrings: [40],     cassette: [10,11,13,15,17,19,21,24,28,32,38,44] },
+  { key: 'sram-xplr-1x13-40-10-46',   label: 'SRAM XPLR 1×13 40 × 10-46',    chainrings: [40],     cassette: [10,11,12,13,15,17,19,21,24,28,32,38,46] },
+];
+
 // ─── Unit Detection (must happen early, before DOM is fully parsed) ─────────────
 
 injectUnitDetector();
@@ -533,6 +551,9 @@ function createPanel() {
               <button class="di2va-speed-btn" data-speed="5">5×</button>
               <button class="di2va-speed-btn" data-speed="10">10×</button>
               <button class="di2va-speed-btn" data-speed="20">20×</button>
+              <button class="di2va-speed-btn" data-speed="40">40×</button>
+              <button class="di2va-speed-btn" data-speed="60">60×</button>
+              <button class="di2va-speed-btn" data-speed="100">100×</button>
             </div>
             <span id="di2va-replay-time" class="di2va-replay-time">0:00 / 0:00</span>
           </div>
@@ -561,6 +582,13 @@ function createPanel() {
           <button id="di2va-debug-pick" class="di2va-debug-btn" type="button">Load .FIT File</button>
           <input id="di2va-debug-input" type="file" accept=".fit,.FIT" style="display:none;">
           <span id="di2va-debug-file" class="di2va-debug-file">Drop a FIT here or pick a file</span>
+        </div>
+        <div class="di2va-groupset-override" id="di2va-debug-groupset">
+          <label for="di2va-groupset-select">Override groupset:</label>
+          <select id="di2va-groupset-select" class="di2va-groupset-select">
+            ${COMMON_GROUPSETS.map(g => `<option value="${g.key}">${g.label}</option>`).join('')}
+          </select>
+          <button id="di2va-groupset-reanalyze" class="di2va-groupset-reanalyze" type="button">Re-analyse</button>
         </div>
         <div id="di2va-debug-build" class="di2va-debug-build"></div>
       </div>
@@ -746,6 +774,11 @@ function renderSourceInfo(container, opts) {
     `;
   }
 
+  const activeOverrideKey = opts?.overrideKey || '__detected__';
+  // Sync the dropdown in the floating debug panel (lives outside the main panel).
+  const debugSelect = document.getElementById('di2va-groupset-select');
+  if (debugSelect) debugSelect.value = activeOverrideKey;
+
   safeSetHTML(container, `
     <div class="di2va-source-row">
       <span class="di2va-source">${icon} ${label}</span>
@@ -755,6 +788,72 @@ function renderSourceInfo(container, opts) {
     </div>
     ${setupBlock}
   `);
+}
+
+// ─── Groupset Override / Re-analyse ─────────────────────────────────────────
+
+function wireGroupsetOverride(panel) {
+  const btn = document.getElementById('di2va-groupset-reanalyze');
+  const select = document.getElementById('di2va-groupset-select');
+  if (!btn || !select) return;
+  // Clone to drop any previous listener so repeated renders don't stack handlers.
+  const fresh = btn.cloneNode(true);
+  btn.replaceWith(fresh);
+  fresh.addEventListener('click', () => {
+    const key = select.value;
+    applyGroupsetOverride(panel, key);
+  });
+}
+
+function applyGroupsetOverride(panel, key) {
+  const state = panel._di2vaState;
+  if (!state) return;
+
+  const preset = COMMON_GROUPSETS.find(g => g.key === key);
+  const usingDetected = !preset || key === '__detected__';
+
+  // Build a fresh analysis config.
+  let analysisConfig;
+  if (usingDetected) {
+    analysisConfig = pickAnalysisConfig(state.userDrivetrainConfig, state.groupset);
+  } else {
+    analysisConfig = {
+      ...(state.userDrivetrainConfig || {}),
+      chainrings: preset.chainrings,
+      cassette: preset.cassette,
+    };
+  }
+
+  // For estimated mode, re-estimate gears with the new drivetrain.
+  let gears = state.gears;
+  if (state.source === 'estimated' && state.streams?.cadence && state.streams?.velocity_smooth) {
+    gears = estimateGearsForActivity(
+      state.streams.cadence,
+      state.streams.velocity_smooth,
+      analysisConfig
+    );
+    state.gears = gears;
+  }
+
+  // Re-run shift analysis with new config.
+  const analysis = analyseShifting(state.streams, gears, analysisConfig);
+
+  // Update state so zoom handler picks up new config.
+  state.analysisConfig = analysisConfig;
+  state.overrideKey = key;
+
+  // Re-render score + gear stats (gears may have changed in estimated mode).
+  renderScore(panel.querySelector('#di2va-score'), analysis);
+  renderGearStats(panel.querySelector('#di2va-stats'), gears, state.streams);
+
+  // Re-render source info to preserve current selection in the dropdown.
+  renderSourceInfo(panel.querySelector('#di2va-source-info'), {
+    source: state.source,
+    groupset: state.groupset,
+    debugMode: !!state.debugMode,
+    overrideKey: key,
+  });
+  wireGroupsetOverride(panel);
 }
 
 // ─── FIT File Drop Zone ─────────────────────────────────────────────────────
@@ -1052,11 +1151,25 @@ async function init() {
     loadingEl.style.display = 'none';
     contentEl.style.display = '';
 
+    // Stash state so the groupset override / re-analyse button can rerun analysis.
+    panel._di2vaState = {
+      streams,
+      gears,
+      source,
+      groupset,
+      analysisConfig,
+      userDrivetrainConfig,
+      debugMode: false,
+      overrideKey: '__detected__',
+    };
+
     renderSourceInfo(panel.querySelector('#di2va-source-info'), {
       source,
       groupset,
-      debugMode: false
+      debugMode: false,
+      overrideKey: '__detected__',
     });
+    wireGroupsetOverride(panel);
     renderScore(panel.querySelector('#di2va-score'), analysis);
     renderGearStats(panel.querySelector('#di2va-stats'), gears, streams);
     renderLegend(panel.querySelector('#di2va-legend'));
@@ -1077,9 +1190,9 @@ async function init() {
       gears,
       isDarkMode(),
       panel.querySelector('#di2va-hover-info'),
-      (startIdx, endIdx) => handleZoomChange(panel, streams, gears, startIdx, endIdx, analysisConfig),
+      (startIdx, endIdx) => handleZoomChange(panel, streams, panel._di2vaState.gears, startIdx, endIdx, panel._di2vaState.analysisConfig),
       [replayPosPlugin],
-      (idx) => updateDrivetrainOnHover(panel, gears, streams, idx)
+      (idx) => updateDrivetrainOnHover(panel, panel._di2vaState.gears, streams, idx)
     );
     
     // Store chart instance for later cleanup
@@ -1160,11 +1273,25 @@ async function renderWithFitData(fitResult, activityId, panel, opts = {}) {
     loadingEl.style.display = 'none';
     contentEl.style.display = '';
 
+    // Stash state for the groupset override / re-analyse button.
+    panel._di2vaState = {
+      streams,
+      gears,
+      source: 'fit',
+      groupset: fitResult.groupset || null,
+      analysisConfig,
+      userDrivetrainConfig,
+      debugMode,
+      overrideKey: '__detected__',
+    };
+
     renderSourceInfo(panel.querySelector('#di2va-source-info'), {
       source: 'fit',
       groupset: fitResult.groupset || null,
-      debugMode
+      debugMode,
+      overrideKey: '__detected__',
     });
+    wireGroupsetOverride(panel);
     renderScore(panel.querySelector('#di2va-score'), analysis);
     renderGearStats(panel.querySelector('#di2va-stats'), gears, streams);
     renderLegend(panel.querySelector('#di2va-legend'));
@@ -1183,9 +1310,9 @@ async function renderWithFitData(fitResult, activityId, panel, opts = {}) {
       gears,
       isDarkMode(),
       panel.querySelector('#di2va-hover-info'),
-      (startIdx, endIdx) => handleZoomChange(panel, streams, gears, startIdx, endIdx, analysisConfig),
+      (startIdx, endIdx) => handleZoomChange(panel, streams, panel._di2vaState.gears, startIdx, endIdx, panel._di2vaState.analysisConfig),
       [replayPosPlugin],
-      (idx) => updateDrivetrainOnHover(panel, gears, streams, idx)
+      (idx) => updateDrivetrainOnHover(panel, panel._di2vaState.gears, streams, idx)
     );
     
     // Store chart instance for later cleanup

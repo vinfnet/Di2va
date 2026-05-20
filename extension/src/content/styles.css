@@ -409,6 +409,73 @@
   color: #bfdbfe;
 }
 
+/* ─── Groupset Override ────────────────────────────────────────────── */
+
+.di2va-groupset-override {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #f8fafc;
+  font-size: 11px;
+}
+
+.di2va-groupset-override label {
+  font-weight: 600;
+  color: #334155;
+}
+
+.di2va-groupset-select {
+  flex: 1 1 180px;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #111827;
+  font-family: inherit;
+}
+
+.di2va-groupset-reanalyze {
+  padding: 4px 10px;
+  border: 1px solid #fc4c02;
+  border-radius: 3px;
+  background: #fc4c02;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.di2va-groupset-reanalyze:hover {
+  background: #e04300;
+  border-color: #e04300;
+}
+
+.sauce-theme-dark .di2va-groupset-override,
+[data-theme="dark"] .di2va-groupset-override {
+  background: #0b1735;
+  border-color: #1d4ed8;
+}
+
+.sauce-theme-dark .di2va-groupset-override label,
+[data-theme="dark"] .di2va-groupset-override label {
+  color: #bfdbfe;
+}
+
+.sauce-theme-dark .di2va-groupset-select,
+[data-theme="dark"] .di2va-groupset-select {
+  background: #111827;
+  border-color: #1e3a8a;
+  color: #e5e7eb;
+}
+
 /* ─── Score ───────────────────────────────────────────────────────── */
 
 .di2va-score-header {
