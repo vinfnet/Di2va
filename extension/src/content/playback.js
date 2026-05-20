@@ -431,7 +431,7 @@ function updateReplayAI(panel, index, streams, gear) {
       <span class="di2va-ai-detail">Waiting for data…</span>
     </div>`;
     safeSetHTML(rowsEl, rows);
-    if (sugEl) sugEl.innerHTML = '';
+    if (sugEl) sugEl.replaceChildren();
     return;
   }
 
@@ -486,9 +486,9 @@ function updateReplayAI(panel, index, streams, gear) {
   // Suggestion
   if (sugEl) {
     if (!hasGear || speed == null) {
-      sugEl.innerHTML = '';
+      sugEl.replaceChildren();
     } else if (gearMatch || ratioClose) {
-      sugEl.innerHTML = '<span class="di2va-ai-ok">👍 Good gear choice</span>';
+      safeSetHTML(sugEl, '<span class="di2va-ai-ok">👍 Good gear choice</span>');
     } else if (optimal) {
       let suggestion = `Try <strong>${optimal.front}×${optimal.rear}</strong>`;
       // Suggest cadence target based on gradient
@@ -502,7 +502,7 @@ function updateReplayAI(panel, index, streams, gear) {
       if (crossChained) suggestion += ' (avoids cross-chain)';
       safeSetHTML(sugEl, `<span class="di2va-ai-suggest">💡 ${suggestion}</span>`);
     } else {
-      sugEl.innerHTML = '';
+      sugEl.replaceChildren();
     }
   }
 }
@@ -539,8 +539,8 @@ export function syncReplayToZoom(panel, streams, gears, startIdx, endIdx) {
   // Clear AI analysis box
   const rowsEl = panel.querySelector('#di2va-ai-rows');
   const sugEl = panel.querySelector('#di2va-ai-suggestion');
-  if (rowsEl) rowsEl.innerHTML = '';
-  if (sugEl) sugEl.innerHTML = '';
+  if (rowsEl) rowsEl.replaceChildren();
+  if (sugEl) sugEl.replaceChildren();
 
   // Constrain scrubber to zoomed range
   if (scrubber) {

@@ -473,7 +473,7 @@ function createPanel() {
   const panel = document.createElement('div');
   panel.id = 'di2va-panel';
   panel.classList.add('di2va-collapsed'); // start collapsed
-  panel.innerHTML = `
+  safeSetHTML(panel, `
     <div class="di2va-header" id="di2va-toggle">
       <span class="di2va-logo">⛓ Di2va</span>
       <span class="di2va-status" id="di2va-status">Loading…</span>
@@ -569,14 +569,14 @@ function createPanel() {
       </div>
       <div class="di2va-error" id="di2va-error" style="display:none;"></div>
     </div>
-  `;
+  `);
 
   // Create the floating debug panel and add to body
   if (!document.getElementById('di2va-debug-panel')) {
     const debugPanel = document.createElement('div');
     debugPanel.className = 'di2va-debug-panel di2va-debug-collapsed';
     debugPanel.id = 'di2va-debug-panel';
-    debugPanel.innerHTML = `
+    safeSetHTML(debugPanel, `
       <div class="di2va-debug-content" id="di2va-debug-content">
         <div class="di2va-debug-controls">
           <button id="di2va-debug-pick" class="di2va-debug-btn" type="button">Load .FIT File</button>
@@ -592,7 +592,7 @@ function createPanel() {
         </div>
         <div id="di2va-debug-build" class="di2va-debug-build"></div>
       </div>
-    `;
+    `);
     document.body.appendChild(debugPanel);
 
     // Setup drag-drop for the floating debug panel
