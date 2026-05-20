@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Di2va — Shimano Di2 Gear Overlay for Strava",
   "short_name": "Di2va",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Visualize Shimano Di2 electronic gear shifts on Strava activity pages — gear-colored routes, elevation profiles, shift analysis and more.",
   "author": "vINF",
 
