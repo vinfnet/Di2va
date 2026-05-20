@@ -76,6 +76,42 @@ npm run build
 - If no FIT file is available, gears are estimated from cadence + speed
 - A collapsible panel is injected below the Strava map with the elevation chart, gear analysis, drivetrain animation, and shifting analysis
 
+### Groupset Auto-Detection
+
+![Di2va Strava activity overview with detected groupset and override controls](docs/screenshots/di2va-groupset-detection.png)
+
+*Di2va in action on a Strava activity page (dark mode) — detected groupset and chainring/cassette range in the blue box, gear-usage cards, shift-quality score, gear-coloured elevation profile, and the playback controls (1× → 100×). The **Debug** button in the header toggles the floating bottom-left panel that hosts the **Override groupset** dropdown and **Re-analyse** button.*
+
+> **Tested groupsets:** Di2va has been successfully tested end-to-end with **Shimano Di2** and **SRAM AXS** FIT files. Campagnolo EPS and FSA WE detection logic is in place but has not yet been verified against real-world rides — feedback and sample FIT files welcome.
+
+When a FIT file is available, Di2va tries to identify the groupset (Shimano Di2, SRAM AXS, Campagnolo EPS, FSA WE) so the analysis uses sensible defaults. Detection is a weighted score combining two signals:
+
+1. **Device metadata in the FIT file** — manufacturer ID, `product_name` and `device_name` strings on `device_info` records are matched against vendor keywords (`shimano`, `di2`, `dura-ace`, `sram`, `axs`, `etap`, `campagnolo`, `eps`, `fsa we`, …). Strong matches (e.g. Shimano manufacturer ID `41`) score highest.
+2. **Observed gear signature** — the set of chainring and cassette teeth actually used during the ride. A 10T smallest cog is treated as a strong SRAM AXS indicator; the `11-12-13-14-15-17-19-21-24-27-30-34` cassette pattern points to Shimano 12-speed; common pairings like `48/35` (SRAM) or `50/34` (Shimano compact) add weight to the corresponding vendor.
+
+The highest-scoring vendor wins. If nothing scores, the panel shows *Unknown groupset* but the chainring/cassette range pulled from the ride still drives the analysis.
+
+#### Why detection can be wrong
+
+Auto-detection only sees what the ride contains. It can be incomplete or misleading when:
+
+- The FIT file has no device metadata (older head units, third-party recorders).
+- You didn't use every chainring or sprocket on the ride, so the inferred range is narrower than your actual cassette.
+- Two vendors share a teeth signature (e.g. an 11-28 11-speed cassette is identical between Shimano and SRAM mechanical groupsets).
+- A bike-computer firmware reports a generic `electronic` device rather than a vendor-specific one.
+
+#### Overriding the detected groupset
+
+If the detected groupset looks wrong, you can pick the right one yourself without touching the options page:
+
+1. On the Strava activity page, click the **Debug** button in the Di2va panel header. The floating debug panel appears in the bottom-left corner.
+2. In the **Override groupset** dropdown, choose one of the popular presets (Shimano 2×11/2×12, SRAM AXS 2×12, SRAM XPLR 1×12/1×13, Shimano GRX 1×11, etc.).
+3. Click **Re-analyse**.
+
+The shift score, gear-usage stats, cross-chain detection, optimal-gear suggestions and any zoomed section scores are recomputed against the chosen drivetrain. Selecting *Detected from ride data* reverts to the auto-detected configuration.
+
+For a permanent override (applies to every ride), set explicit chainring and cassette teeth on the extension's options page; user-configured drivetrains always take precedence over auto-detection.
+
 ### Data Privacy
 
 **All data processing happens locally in your browser.** The extension communicates only with Strava's own servers (to fetch your activity data) using your existing session. No data is sent to any third-party service — including the Shifting Analysis, which is a local rules engine, not a cloud AI service.
@@ -121,6 +157,8 @@ npm run package:firefox  # Build + create Firefox .zip
 
 <details>
 <summary><h2>Advanced: Standalone Web App</h2></summary>
+
+> ⚠️ **Deprecated.** The standalone web app is no longer actively developed. All active development, bug fixes, and new features are happening in the **browser extension** only. The code is kept here for reference and for users who want a full-screen activity browser, but it may lag behind the extension in features and groupset support.
 
 The standalone web app is the original Di2va interface. It requires Strava OAuth credentials but provides a full activity browser with map overlay and route coloring. All the extension features are available here too, plus additional capabilities.
 

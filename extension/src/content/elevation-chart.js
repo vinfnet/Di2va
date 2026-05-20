@@ -311,11 +311,9 @@ export function renderElevationChart(canvas, streams, gears, isDark, hoverEl, on
           title: { display: true, text: `Distance (${distUnit()})`, color: textColor },
           ticks: {
             color: textColor,
-            maxTicksLimit: 20,
-            callback: (val, idx) => {
-              const step = Math.max(1, Math.floor(distances.length / 20));
-              return idx % step === 0 ? distances[idx] : '';
-            }
+            maxTicksLimit: 10,
+            autoSkip: true,
+            autoSkipPadding: 20
           },
           grid: { color: gridColor }
         },
